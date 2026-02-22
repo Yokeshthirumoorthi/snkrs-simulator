@@ -27,7 +27,7 @@ from users import get_users
 from inventory import select_drop_product, StockTracker, PRODUCTS
 from patterns import get_incident_for_drop, PATTERNS
 from metrics import generate_metrics_for_interval
-from writer import OTLPWriter, worker_fn
+from writer import OTLPWriter, FileWriter, create_writer, worker_fn
 
 # ── Tier definitions ────────────────────────────────────────────────────
 
@@ -72,6 +72,14 @@ TIERS = {
         "users_per_drop": 10_000,
         "sessions_multiplier": 2.0,
     },
+    "xxl": {
+        "label": "XXL — TB Scale",
+        "target_spans": 1_000_000_000,
+        "drops": 1000,
+        "time_range_hours": 2160,  # 90 days
+        "users_per_drop": 20_000,
+        "sessions_multiplier": 3.0,
+    },
 }
 
 
@@ -95,7 +103,7 @@ def build_drop_schedule(tier: dict, start_time: datetime) -> list[tuple]:
         drop_end = drop_start + timedelta(minutes=drop_duration_min)
 
         product = select_drop_product(i, rng)
-        incident = get_incident_for_drop(i)
+        incident = get_incident_for_drop(i, rng=rng)
 
         schedule.append((i, product, incident, drop_start, drop_end))
 
@@ -112,11 +120,14 @@ def generate_metrics_centrally(drop_schedule: list, tier: dict,
                                otel_config: dict):
     """Generate metrics in the main process (not parallelized — they're small)."""
     print("\n  Generating metrics...")
-    writer = OTLPWriter(
-        endpoint=otel_config["endpoint"],
+    writer = create_writer(
+        output_mode=otel_config.get("output_mode", "grpc"),
+        output_dir=otel_config.get("output_dir", "./output"),
+        endpoint=otel_config.get("endpoint", "localhost:4317"),
         batch_size=otel_config.get("batch_size", 5_000),
+        compress=otel_config.get("compress", False),
+        worker_id=999,  # dedicated metrics worker
     )
-    writer.connect()
 
     rng = random.Random(54321)
 
@@ -162,7 +173,9 @@ def generate_metrics_centrally(drop_schedule: list, tier: dict,
     return stats
 
 
-def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int):
+def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int,
+        output_mode: str = "grpc", output_dir: str = "./output",
+        compress: bool = False):
     """Main generation orchestrator."""
     tier = TIERS[tier_name]
     print("=" * 65)
@@ -174,7 +187,9 @@ def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int):
     print(f"  Users/drop: {tier['users_per_drop']:,}")
     print(f"  Workers:    {workers}")
     print(f"  Batch size: {batch_size:,}")
-    print(f"  OTEL endpoint: {otel_endpoint}")
+    print(f"  Output:     {output_mode}" + (f" → {output_dir}" if output_mode == "file" else f" → {otel_endpoint}"))
+    if compress:
+        print(f"  Compress:   gzip")
     print("=" * 65)
 
     start_time = time.time()
@@ -201,6 +216,9 @@ def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int):
     otel_config = {
         "endpoint": otel_endpoint,
         "batch_size": batch_size,
+        "output_mode": output_mode,
+        "output_dir": output_dir,
+        "compress": compress,
     }
 
     # Partition users across workers
@@ -208,11 +226,12 @@ def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int):
     # Adjust: if we have more workers than users, trim
     actual_workers = len(user_chunks)
 
-    # Build worker args
-    worker_args = [
-        (chunk, (schedule_start, end_time), drop_schedule, otel_config)
-        for chunk in user_chunks
-    ]
+    # Build worker args — each worker gets a unique ID for file partitioning
+    worker_args = []
+    for i, chunk in enumerate(user_chunks):
+        config = dict(otel_config, worker_id=i)
+        worker_args.append((chunk, (schedule_start, end_time), drop_schedule, config))
+
 
     print(f"  Launching {actual_workers} worker processes...")
     pool_start = time.time()
@@ -248,13 +267,16 @@ def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int):
     print(f"  Total:   {grand_total:,} rows")
     print(f"  Time:    {elapsed:.1f}s")
     print(f"  Rate:    {grand_total / max(1, elapsed):,.0f} rows/sec")
+    if output_mode == "file":
+        total_mb = sum(r.get("mb_written", 0) for r in results) + metric_stats.get("mb_written", 0)
+        print(f"  Output:  {total_mb:.1f} MB → {output_dir}")
     print("=" * 65)
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Nike SNKRS Load Generator — OTLP pipeline loader")
-    parser.add_argument("--tier", choices=["xs", "s", "m", "l", "xl"],
+    parser.add_argument("--tier", choices=["xs", "s", "m", "l", "xl", "xxl"],
                         default="xs", help="Volume tier (default: xs)")
     parser.add_argument("--workers", type=int, default=None,
                         help="Number of worker processes (default: cpu_count - 4)")
@@ -263,6 +285,12 @@ def main():
                         help="OTEL Collector gRPC endpoint (default: localhost:4317)")
     parser.add_argument("--batch-size", type=int, default=5_000,
                         help="Events per gRPC batch (default: 5000)")
+    parser.add_argument("--output-mode", choices=["grpc", "file"], default="grpc",
+                        help="Output mode: grpc (OTEL Collector) or file (direct JSON)")
+    parser.add_argument("--output-dir", default="./output",
+                        help="Output directory for file mode (default: ./output)")
+    parser.add_argument("--compress", action="store_true",
+                        help="Enable gzip compression for file output")
 
     args = parser.parse_args()
 
@@ -270,7 +298,9 @@ def main():
         cpu_count = multiprocessing.cpu_count()
         args.workers = max(1, min(cpu_count - 4, 36))
 
-    run(args.tier, args.workers, args.otel_endpoint, args.batch_size)
+    run(args.tier, args.workers, args.otel_endpoint, args.batch_size,
+        output_mode=args.output_mode, output_dir=args.output_dir,
+        compress=args.compress)
 
 
 if __name__ == "__main__":

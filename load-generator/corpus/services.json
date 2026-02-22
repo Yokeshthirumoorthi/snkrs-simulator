@@ -1,0 +1,873 @@
+[
+  {
+    "name": "api-gateway",
+    "version": "5.7.11",
+    "language": "java",
+    "framework": "spring-boot",
+    "port": 8080,
+    "dependencies": [
+      "returns-service"
+    ],
+    "databases": [
+      {
+        "type": "dynamodb",
+        "name": "api-gateway-dynam"
+      },
+      {
+        "type": "mongodb",
+        "name": "api-gateway-mongo"
+      }
+    ],
+    "queues": [],
+    "replicas": 9,
+    "cpu_limit": "250m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "auth-service",
+    "version": "1.10.5",
+    "language": "python",
+    "framework": "fastapi",
+    "port": 8081,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "postgresql",
+        "name": "auth-postg"
+      },
+      {
+        "type": "postgresql",
+        "name": "auth-postg"
+      }
+    ],
+    "queues": [
+      {
+        "system": "sqs",
+        "topics": [
+          "snkrs.auth.events"
+        ]
+      }
+    ],
+    "replicas": 5,
+    "cpu_limit": "500m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "product-service",
+    "version": "4.6.0",
+    "language": "rust",
+    "framework": "actix",
+    "port": 8082,
+    "dependencies": [
+      "pricing-service",
+      "feed-service",
+      "ab-test-service"
+    ],
+    "databases": [
+      {
+        "type": "redis",
+        "name": "product-redis"
+      },
+      {
+        "type": "redis",
+        "name": "product-redis"
+      }
+    ],
+    "queues": [],
+    "replicas": 5,
+    "cpu_limit": "2000m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "draw-service",
+    "version": "2.5.10",
+    "language": "java",
+    "framework": "spring-boot",
+    "port": 8083,
+    "dependencies": [
+      "notification-service"
+    ],
+    "databases": [
+      {
+        "type": "postgresql",
+        "name": "draw-postg"
+      },
+      {
+        "type": "elasticsearch",
+        "name": "draw-elast"
+      }
+    ],
+    "queues": [
+      {
+        "system": "rabbitmq",
+        "topics": [
+          "snkrs.draw.events"
+        ]
+      }
+    ],
+    "replicas": 5,
+    "cpu_limit": "2000m",
+    "memory_limit": "256Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "inventory-service",
+    "version": "5.2.9",
+    "language": "node",
+    "framework": "express",
+    "port": 8084,
+    "dependencies": [
+      "queue-service",
+      "shipping-service",
+      "cache-service",
+      "wishlist-service"
+    ],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "inventory-mongo"
+      },
+      {
+        "type": "elasticsearch",
+        "name": "inventory-elast"
+      },
+      {
+        "type": "postgresql",
+        "name": "inventory-postg"
+      }
+    ],
+    "queues": [
+      {
+        "system": "sqs",
+        "topics": [
+          "snkrs.inventory.events"
+        ]
+      }
+    ],
+    "replicas": 3,
+    "cpu_limit": "500m",
+    "memory_limit": "1Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "payment-service",
+    "version": "2.9.12",
+    "language": "go",
+    "framework": "gin",
+    "port": 8085,
+    "dependencies": [
+      "draw-service",
+      "order-service"
+    ],
+    "databases": [
+      {
+        "type": "redis",
+        "name": "payment-redis"
+      },
+      {
+        "type": "elasticsearch",
+        "name": "payment-elast"
+      }
+    ],
+    "queues": [
+      {
+        "system": "rabbitmq",
+        "topics": [
+          "snkrs.payment.events"
+        ]
+      }
+    ],
+    "replicas": 8,
+    "cpu_limit": "500m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "order-service",
+    "version": "5.0.11",
+    "language": "rust",
+    "framework": "actix",
+    "port": 8086,
+    "dependencies": [
+      "review-service"
+    ],
+    "databases": [
+      {
+        "type": "redis",
+        "name": "order-redis"
+      },
+      {
+        "type": "redis",
+        "name": "order-redis"
+      }
+    ],
+    "queues": [
+      {
+        "system": "sqs",
+        "topics": [
+          "snkrs.order.events"
+        ]
+      }
+    ],
+    "replicas": 2,
+    "cpu_limit": "2000m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "notification-service",
+    "version": "5.0.7",
+    "language": "node",
+    "framework": "express",
+    "port": 8087,
+    "dependencies": [
+      "loyalty-service",
+      "queue-service",
+      "review-service",
+      "analytics-service"
+    ],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "notification-mongo"
+      },
+      {
+        "type": "mongodb",
+        "name": "notification-mongo"
+      },
+      {
+        "type": "mongodb",
+        "name": "notification-mongo"
+      }
+    ],
+    "queues": [
+      {
+        "system": "kafka",
+        "topics": [
+          "snkrs.notification.events"
+        ]
+      }
+    ],
+    "replicas": 6,
+    "cpu_limit": "250m",
+    "memory_limit": "1Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "feed-service",
+    "version": "5.1.8",
+    "language": "rust",
+    "framework": "actix",
+    "port": 8088,
+    "dependencies": [
+      "payment-service",
+      "content-service"
+    ],
+    "databases": [
+      {
+        "type": "elasticsearch",
+        "name": "feed-elast"
+      },
+      {
+        "type": "mongodb",
+        "name": "feed-mongo"
+      }
+    ],
+    "queues": [
+      {
+        "system": "kafka",
+        "topics": [
+          "snkrs.feed.events"
+        ]
+      }
+    ],
+    "replicas": 10,
+    "cpu_limit": "1000m",
+    "memory_limit": "256Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "search-service",
+    "version": "4.4.11",
+    "language": "rust",
+    "framework": "actix",
+    "port": 8089,
+    "dependencies": [
+      "analytics-service"
+    ],
+    "databases": [
+      {
+        "type": "redis",
+        "name": "search-redis"
+      }
+    ],
+    "queues": [
+      {
+        "system": "kafka",
+        "topics": [
+          "snkrs.search.events"
+        ]
+      }
+    ],
+    "replicas": 3,
+    "cpu_limit": "2000m",
+    "memory_limit": "256Mi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "recommendation-service",
+    "version": "2.12.1",
+    "language": "go",
+    "framework": "gin",
+    "port": 8090,
+    "dependencies": [
+      "rate-limiter-service",
+      "returns-service",
+      "session-service",
+      "cache-service"
+    ],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "recommendation-mongo"
+      },
+      {
+        "type": "redis",
+        "name": "recommendation-redis"
+      },
+      {
+        "type": "elasticsearch",
+        "name": "recommendation-elast"
+      }
+    ],
+    "queues": [
+      {
+        "system": "kafka",
+        "topics": [
+          "snkrs.recommendation.events"
+        ]
+      }
+    ],
+    "replicas": 7,
+    "cpu_limit": "1000m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "shipping-service",
+    "version": "3.10.4",
+    "language": "python",
+    "framework": "fastapi",
+    "port": 8091,
+    "dependencies": [
+      "image-service",
+      "feed-service"
+    ],
+    "databases": [
+      {
+        "type": "postgresql",
+        "name": "shipping-postg"
+      },
+      {
+        "type": "redis",
+        "name": "shipping-redis"
+      },
+      {
+        "type": "mongodb",
+        "name": "shipping-mongo"
+      }
+    ],
+    "queues": [],
+    "replicas": 4,
+    "cpu_limit": "500m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "returns-service",
+    "version": "1.6.16",
+    "language": "go",
+    "framework": "gin",
+    "port": 8092,
+    "dependencies": [
+      "review-service",
+      "inventory-service",
+      "image-service"
+    ],
+    "databases": [
+      {
+        "type": "dynamodb",
+        "name": "returns-dynam"
+      },
+      {
+        "type": "mongodb",
+        "name": "returns-mongo"
+      },
+      {
+        "type": "mongodb",
+        "name": "returns-mongo"
+      }
+    ],
+    "queues": [
+      {
+        "system": "rabbitmq",
+        "topics": [
+          "snkrs.returns.events"
+        ]
+      }
+    ],
+    "replicas": 6,
+    "cpu_limit": "1000m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "wishlist-service",
+    "version": "3.1.17",
+    "language": "python",
+    "framework": "fastapi",
+    "port": 8093,
+    "dependencies": [
+      "api-gateway",
+      "session-service",
+      "content-service",
+      "geo-service"
+    ],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "wishlist-mongo"
+      }
+    ],
+    "queues": [],
+    "replicas": 8,
+    "cpu_limit": "500m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "analytics-service",
+    "version": "4.12.10",
+    "language": "node",
+    "framework": "express",
+    "port": 8094,
+    "dependencies": [
+      "recommendation-service",
+      "user-preference-service"
+    ],
+    "databases": [
+      {
+        "type": "dynamodb",
+        "name": "analytics-dynam"
+      },
+      {
+        "type": "elasticsearch",
+        "name": "analytics-elast"
+      }
+    ],
+    "queues": [
+      {
+        "system": "rabbitmq",
+        "topics": [
+          "snkrs.analytics.events"
+        ]
+      }
+    ],
+    "replicas": 2,
+    "cpu_limit": "250m",
+    "memory_limit": "256Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "pricing-service",
+    "version": "2.11.4",
+    "language": "java",
+    "framework": "spring-boot",
+    "port": 8095,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "pricing-mongo"
+      }
+    ],
+    "queues": [
+      {
+        "system": "sqs",
+        "topics": [
+          "snkrs.pricing.events"
+        ]
+      }
+    ],
+    "replicas": 6,
+    "cpu_limit": "500m",
+    "memory_limit": "1Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "review-service",
+    "version": "2.6.20",
+    "language": "python",
+    "framework": "fastapi",
+    "port": 8096,
+    "dependencies": [
+      "product-service",
+      "shipping-service"
+    ],
+    "databases": [
+      {
+        "type": "redis",
+        "name": "review-redis"
+      },
+      {
+        "type": "postgresql",
+        "name": "review-postg"
+      },
+      {
+        "type": "mongodb",
+        "name": "review-mongo"
+      }
+    ],
+    "queues": [],
+    "replicas": 3,
+    "cpu_limit": "250m",
+    "memory_limit": "256Mi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "loyalty-service",
+    "version": "4.0.0",
+    "language": "node",
+    "framework": "express",
+    "port": 8097,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "elasticsearch",
+        "name": "loyalty-elast"
+      }
+    ],
+    "queues": [
+      {
+        "system": "rabbitmq",
+        "topics": [
+          "snkrs.loyalty.events"
+        ]
+      }
+    ],
+    "replicas": 7,
+    "cpu_limit": "250m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "fraud-service",
+    "version": "1.5.11",
+    "language": "node",
+    "framework": "express",
+    "port": 8098,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "fraud-mongo"
+      }
+    ],
+    "queues": [
+      {
+        "system": "kafka",
+        "topics": [
+          "snkrs.fraud.events"
+        ]
+      }
+    ],
+    "replicas": 6,
+    "cpu_limit": "500m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "image-service",
+    "version": "4.5.6",
+    "language": "go",
+    "framework": "gin",
+    "port": 8099,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "elasticsearch",
+        "name": "image-elast"
+      },
+      {
+        "type": "postgresql",
+        "name": "image-postg"
+      },
+      {
+        "type": "elasticsearch",
+        "name": "image-elast"
+      }
+    ],
+    "queues": [],
+    "replicas": 4,
+    "cpu_limit": "2000m",
+    "memory_limit": "2Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "cache-service",
+    "version": "3.6.10",
+    "language": "java",
+    "framework": "spring-boot",
+    "port": 8100,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "postgresql",
+        "name": "cache-postg"
+      }
+    ],
+    "queues": [
+      {
+        "system": "sqs",
+        "topics": [
+          "snkrs.cache.events"
+        ]
+      }
+    ],
+    "replicas": 4,
+    "cpu_limit": "500m",
+    "memory_limit": "1Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "queue-service",
+    "version": "2.11.12",
+    "language": "go",
+    "framework": "gin",
+    "port": 8101,
+    "dependencies": [
+      "image-service",
+      "geo-service",
+      "search-service",
+      "content-service"
+    ],
+    "databases": [
+      {
+        "type": "postgresql",
+        "name": "queue-postg"
+      },
+      {
+        "type": "dynamodb",
+        "name": "queue-dynam"
+      },
+      {
+        "type": "redis",
+        "name": "queue-redis"
+      }
+    ],
+    "queues": [
+      {
+        "system": "rabbitmq",
+        "topics": [
+          "snkrs.queue.events"
+        ]
+      }
+    ],
+    "replicas": 6,
+    "cpu_limit": "250m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "config-service",
+    "version": "1.8.0",
+    "language": "node",
+    "framework": "express",
+    "port": 8102,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "config-mongo"
+      }
+    ],
+    "queues": [],
+    "replicas": 7,
+    "cpu_limit": "1000m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "rate-limiter-service",
+    "version": "1.0.18",
+    "language": "rust",
+    "framework": "actix",
+    "port": 8103,
+    "dependencies": [
+      "shipping-service",
+      "loyalty-service",
+      "queue-service"
+    ],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "rate-limiter-mongo"
+      }
+    ],
+    "queues": [],
+    "replicas": 3,
+    "cpu_limit": "250m",
+    "memory_limit": "1Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "geo-service",
+    "version": "5.12.13",
+    "language": "java",
+    "framework": "spring-boot",
+    "port": 8104,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "elasticsearch",
+        "name": "geo-elast"
+      },
+      {
+        "type": "dynamodb",
+        "name": "geo-dynam"
+      }
+    ],
+    "queues": [],
+    "replicas": 8,
+    "cpu_limit": "2000m",
+    "memory_limit": "256Mi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "content-service",
+    "version": "2.8.10",
+    "language": "python",
+    "framework": "fastapi",
+    "port": 8105,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "postgresql",
+        "name": "content-postg"
+      },
+      {
+        "type": "elasticsearch",
+        "name": "content-elast"
+      }
+    ],
+    "queues": [],
+    "replicas": 8,
+    "cpu_limit": "250m",
+    "memory_limit": "1Gi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "ab-test-service",
+    "version": "1.7.19",
+    "language": "go",
+    "framework": "gin",
+    "port": 8106,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "postgresql",
+        "name": "ab-test-postg"
+      }
+    ],
+    "queues": [],
+    "replicas": 2,
+    "cpu_limit": "1000m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "user-preference-service",
+    "version": "5.8.8",
+    "language": "java",
+    "framework": "spring-boot",
+    "port": 8107,
+    "dependencies": [
+      "config-service"
+    ],
+    "databases": [
+      {
+        "type": "redis",
+        "name": "user-preference-redis"
+      }
+    ],
+    "queues": [
+      {
+        "system": "sqs",
+        "topics": [
+          "snkrs.user-preference.events"
+        ]
+      }
+    ],
+    "replicas": 4,
+    "cpu_limit": "1000m",
+    "memory_limit": "512Mi",
+    "k8s_namespace": "snkrs-infra"
+  },
+  {
+    "name": "session-service",
+    "version": "5.10.2",
+    "language": "java",
+    "framework": "spring-boot",
+    "port": 8108,
+    "dependencies": [],
+    "databases": [
+      {
+        "type": "mongodb",
+        "name": "session-mongo"
+      },
+      {
+        "type": "dynamodb",
+        "name": "session-dynam"
+      }
+    ],
+    "queues": [
+      {
+        "system": "sqs",
+        "topics": [
+          "snkrs.session.events"
+        ]
+      }
+    ],
+    "replicas": 9,
+    "cpu_limit": "2000m",
+    "memory_limit": "1Gi",
+    "k8s_namespace": "snkrs-platform"
+  },
+  {
+    "name": "audit-service",
+    "version": "1.3.16",
+    "language": "node",
+    "framework": "express",
+    "port": 8109,
+    "dependencies": [
+      "payment-service",
+      "shipping-service",
+      "feed-service",
+      "geo-service"
+    ],
+    "databases": [
+      {
+        "type": "elasticsearch",
+        "name": "audit-elast"
+      }
+    ],
+    "queues": [],
+    "replicas": 2,
+    "cpu_limit": "250m",
+    "memory_limit": "256Mi",
+    "k8s_namespace": "snkrs-platform"
+  }
+]

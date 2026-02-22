@@ -1,11 +1,15 @@
 """
-OTLP gRPC writer — sends generated spans/logs/metrics through the OTEL pipeline
-as protobuf messages via gRPC, same path as production telemetry.
+OTLP writer — sends generated spans/logs/metrics through the OTEL pipeline
+as protobuf messages via gRPC, or writes directly to JSON files for TB scale.
 """
 
+import gzip
+import json
+import os
 import time
 from datetime import datetime
 from collections import defaultdict
+from pathlib import Path
 
 import grpc
 from opentelemetry.proto.common.v1.common_pb2 import (
@@ -376,6 +380,219 @@ class OTLPWriter:
               f"rate={s['rows_per_sec']:,} rows/sec")
 
 
+# ── FileWriter — direct JSON output for TB scale ──────────────────────────
+
+class FileWriter:
+    """Write OTLP-compatible JSON files directly, bypassing the collector.
+
+    Output format matches OTEL collector's file exporter / S3 exporter format.
+    Partitioned by 5-minute time buckets for downstream pipeline compatibility.
+    """
+
+    def __init__(self, output_dir: str = "./output", batch_size: int = 5_000,
+                 compress: bool = False, worker_id: int = 0):
+        self.output_dir = Path(output_dir)
+        self.batch_size = batch_size
+        self.compress = compress
+        self.worker_id = worker_id
+
+        # Buffers
+        self._spans = []
+        self._logs = []
+        self._metrics = []
+
+        # Stats
+        self.spans_written = 0
+        self.logs_written = 0
+        self.metrics_written = 0
+        self._start_time = time.time()
+        self._bytes_written = 0
+
+        # File counters per bucket
+        self._file_counters = defaultdict(int)
+
+    def connect(self):
+        """Create output directories."""
+        for signal in ["traces", "logs", "metrics"]:
+            (self.output_dir / signal).mkdir(parents=True, exist_ok=True)
+
+    def close(self):
+        """Flush remaining."""
+        self.flush_all()
+
+    def add_spans(self, spans: list[dict]):
+        self._spans.extend(spans)
+        while len(self._spans) >= self.batch_size:
+            self._flush_spans(self._spans[:self.batch_size])
+            self._spans = self._spans[self.batch_size:]
+
+    def add_logs(self, logs: list[dict]):
+        self._logs.extend(logs)
+        while len(self._logs) >= self.batch_size:
+            self._flush_logs(self._logs[:self.batch_size])
+            self._logs = self._logs[self.batch_size:]
+
+    def add_metrics(self, metrics: list[dict]):
+        self._metrics.extend(metrics)
+        while len(self._metrics) >= self.batch_size:
+            self._flush_metrics(self._metrics[:self.batch_size])
+            self._metrics = self._metrics[self.batch_size:]
+
+    def flush_all(self):
+        if self._spans:
+            self._flush_spans(self._spans)
+            self._spans = []
+        if self._logs:
+            self._flush_logs(self._logs)
+            self._logs = []
+        if self._metrics:
+            self._flush_metrics(self._metrics)
+            self._metrics = []
+
+    def _flush_spans(self, batch: list[dict]):
+        if not batch:
+            return
+        rows = [self._span_to_json(s) for s in batch]
+        self._write_jsonl("traces", batch[0]["Timestamp"], rows)
+        self.spans_written += len(batch)
+
+    def _flush_logs(self, batch: list[dict]):
+        if not batch:
+            return
+        rows = [self._log_to_json(l) for l in batch]
+        self._write_jsonl("logs", batch[0]["Timestamp"], rows)
+        self.logs_written += len(batch)
+
+    def _flush_metrics(self, batch: list[dict]):
+        if not batch:
+            return
+        rows = [self._metric_to_json(m) for m in batch]
+        self._write_jsonl("metrics", batch[0]["Timestamp"], rows)
+        self.metrics_written += len(batch)
+
+    def _get_bucket_path(self, signal: str, ts: datetime) -> Path:
+        """Get time-partitioned file path."""
+        # 5-minute bucket: round down to nearest 5 min
+        minute_bucket = (ts.minute // 5) * 5
+        bucket_dir = self.output_dir / signal / (
+            f"year={ts.year}/month={ts.month:02d}/day={ts.day:02d}/"
+            f"hour={ts.hour:02d}/minute={minute_bucket:02d}")
+        bucket_dir.mkdir(parents=True, exist_ok=True)
+
+        bucket_key = f"{signal}_{ts.year}{ts.month:02d}{ts.day:02d}_{ts.hour:02d}{minute_bucket:02d}"
+        self._file_counters[bucket_key] += 1
+        counter = self._file_counters[bucket_key]
+
+        ext = ".jsonl.gz" if self.compress else ".jsonl"
+        return bucket_dir / f"w{self.worker_id}_{counter:06d}{ext}"
+
+    def _write_jsonl(self, signal: str, ts: datetime, rows: list[dict]):
+        """Write rows as JSON Lines to time-partitioned file."""
+        path = self._get_bucket_path(signal, ts)
+        try:
+            data = "\n".join(json.dumps(r, default=str) for r in rows) + "\n"
+            encoded = data.encode("utf-8")
+
+            if self.compress:
+                encoded = gzip.compress(encoded, compresslevel=1)
+
+            with open(path, "ab") as f:
+                f.write(encoded)
+            self._bytes_written += len(encoded)
+        except Exception as e:
+            print(f"  [ERROR] Failed to write {len(rows)} rows to {path}: {e}")
+
+    def _span_to_json(self, s: dict) -> dict:
+        """Convert span dict to OTLP JSON format."""
+        ts = s["Timestamp"]
+        start_ns = int(ts.timestamp() * 1_000_000_000)
+        return {
+            "Timestamp": ts.isoformat() + "Z",
+            "TraceId": s["TraceId"],
+            "SpanId": s["SpanId"],
+            "ParentSpanId": s["ParentSpanId"],
+            "TraceState": s.get("TraceState", ""),
+            "SpanName": s["SpanName"],
+            "SpanKind": s["SpanKind"],
+            "ServiceName": s["ServiceName"],
+            "ResourceAttributes": s["ResourceAttributes"],
+            "ScopeName": s.get("ScopeName", "snkrs-simulator"),
+            "ScopeVersion": s.get("ScopeVersion", "1.0.0"),
+            "SpanAttributes": s.get("SpanAttributes", {}),
+            "Duration": s["Duration"],
+            "StatusCode": s["StatusCode"],
+            "StatusMessage": s.get("StatusMessage", ""),
+            "Events.Timestamp": s.get("Events.Timestamp", []),
+            "Events.Name": s.get("Events.Name", []),
+            "Events.Attributes": s.get("Events.Attributes", []),
+            "Links.TraceId": s.get("Links.TraceId", []),
+            "Links.SpanId": s.get("Links.SpanId", []),
+            "Links.TraceState": s.get("Links.TraceState", []),
+            "Links.Attributes": s.get("Links.Attributes", []),
+        }
+
+    def _log_to_json(self, l: dict) -> dict:
+        """Convert log dict to OTLP JSON format."""
+        return {
+            "Timestamp": l["Timestamp"].isoformat() + "Z",
+            "TraceId": l.get("TraceId", ""),
+            "SpanId": l.get("SpanId", ""),
+            "SeverityNumber": l.get("SeverityNumber", 9),
+            "SeverityText": l.get("SeverityText", "INFO"),
+            "Body": l.get("Body", ""),
+            "ServiceName": l["ServiceName"],
+            "ResourceAttributes": l["ResourceAttributes"],
+            "LogAttributes": l.get("LogAttributes", {}),
+        }
+
+    def _metric_to_json(self, m: dict) -> dict:
+        """Convert metric dict to OTLP JSON format."""
+        return {
+            "Timestamp": m["Timestamp"].isoformat() + "Z",
+            "MetricName": m["MetricName"],
+            "MetricDescription": m.get("MetricDescription", ""),
+            "MetricUnit": m.get("MetricUnit", ""),
+            "MetricType": m["MetricType"],
+            "Value": m["Value"],
+            "ServiceName": m["ServiceName"],
+            "ResourceAttributes": m["ResourceAttributes"],
+            "MetricAttributes": m.get("MetricAttributes", {}),
+        }
+
+    def stats(self) -> dict:
+        elapsed = time.time() - self._start_time
+        total = self.spans_written + self.logs_written + self.metrics_written
+        return {
+            "spans": self.spans_written,
+            "logs": self.logs_written,
+            "metrics": self.metrics_written,
+            "total": total,
+            "elapsed_s": round(elapsed, 1),
+            "rows_per_sec": round(total / max(1, elapsed)),
+            "bytes_written": self._bytes_written,
+            "mb_written": round(self._bytes_written / (1024 * 1024), 1),
+        }
+
+    def print_progress(self):
+        s = self.stats()
+        print(f"  spans={s['spans']:,}  logs={s['logs']:,}  metrics={s['metrics']:,}  "
+              f"total={s['total']:,}  {s['mb_written']}MB  "
+              f"rate={s['rows_per_sec']:,} rows/sec")
+
+
+def create_writer(output_mode: str = "grpc", output_dir: str = "./output",
+                  endpoint: str = "localhost:4317", batch_size: int = 5_000,
+                  compress: bool = False, worker_id: int = 0):
+    """Factory function to create the appropriate writer."""
+    if output_mode == "file":
+        writer = FileWriter(output_dir=output_dir, batch_size=batch_size,
+                           compress=compress, worker_id=worker_id)
+    else:
+        writer = OTLPWriter(endpoint=endpoint, batch_size=batch_size)
+    writer.connect()
+    return writer
+
+
 def worker_fn(args: tuple) -> dict:
     """Worker function for multiprocessing.
 
@@ -400,11 +617,17 @@ def worker_fn(args: tuple) -> dict:
     from inventory import StockTracker, select_drop_product
     from patterns import PATTERNS, get_incident_for_drop
 
-    writer = OTLPWriter(
-        endpoint=otel_config["endpoint"],
+    # Create the appropriate writer (gRPC or file)
+    output_mode = otel_config.get("output_mode", "grpc")
+    worker_id = otel_config.get("worker_id", 0)
+    writer = create_writer(
+        output_mode=output_mode,
+        output_dir=otel_config.get("output_dir", "./output"),
+        endpoint=otel_config.get("endpoint", "localhost:4317"),
         batch_size=otel_config.get("batch_size", 5_000),
+        compress=otel_config.get("compress", False),
+        worker_id=worker_id,
     )
-    writer.connect()
 
     rng = _random.Random()
     stock_tracker = StockTracker()
@@ -478,10 +701,15 @@ def worker_fn(args: tuple) -> dict:
 
 def _generate_flow(endpoint: str, user: dict, product: dict, ts,
                    stock_tracker, incident, progress, rng):
-    """Generate the appropriate span tree for an endpoint."""
+    """Generate the appropriate span tree for an endpoint.
+
+    Uses topology-based graph traversal for additional endpoints,
+    and original generators for the 5 core endpoints (backward compat).
+    """
     from spans import (generate_browse_product, generate_enter_draw,
                        generate_checkout, generate_account_check, generate_feed)
 
+    # Original 5 endpoints use the detailed hand-crafted generators
     if endpoint == "GET /v1/products/{id}":
         return generate_browse_product(user, product, ts, stock_tracker,
                                        incident, progress, rng)
@@ -495,4 +723,11 @@ def _generate_flow(endpoint: str, user: dict, product: dict, ts,
         return generate_account_check(user, ts, incident, progress, rng)
     elif endpoint == "GET /v1/feed":
         return generate_feed(user, ts, incident, progress, rng)
-    return []
+
+    # Additional endpoints use topology-based graph traversal
+    try:
+        from topology import generate_trace_from_graph
+        return generate_trace_from_graph(endpoint, user, product, ts,
+                                         stock_tracker, incident, progress, rng)
+    except Exception:
+        return []

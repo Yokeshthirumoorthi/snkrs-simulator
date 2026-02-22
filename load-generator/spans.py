@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 from inventory import StockTracker
 from patterns import should_apply_incident
+from distributions import duration_ns as _dist_duration_ns
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -24,8 +25,15 @@ def _span_id() -> str:
     """Generate a 16-char hex span ID."""
     return uuid.uuid4().hex[:16]
 
-def _duration_ns(base_ms: float, jitter: float = 0.3, rng: random.Random = None) -> int:
-    """Generate a duration in nanoseconds with gaussian jitter."""
+def _duration_ns(base_ms: float, jitter: float = 0.3, rng: random.Random = None,
+                 span_name: str = None, progress: float = None) -> int:
+    """Generate a duration in nanoseconds using distribution models.
+
+    If span_name is provided, uses the appropriate distribution model.
+    Otherwise falls back to simple Gaussian for backward compatibility.
+    """
+    if span_name:
+        return _dist_duration_ns(span_name, base_ms, rng=rng, progress=progress)
     r = rng or random
     actual_ms = max(0.1, r.gauss(base_ms, base_ms * jitter))
     return int(actual_ms * 1_000_000)
@@ -92,7 +100,7 @@ def _auth_spans(trace_id: str, parent_id: str, ts: datetime,
     child_offset = 0
 
     # verify_jwt
-    dur = _duration_ns(5 if not is_drop else 15, rng=rng)
+    dur = _duration_ns(5 if not is_drop else 15, rng=rng, span_name="verify_jwt", progress=progress)
     dur = int(dur * lat_mult)
     spans.append(_make_span(trace_id, root_id, "auth-service: verify_jwt",
                             "auth-service", "INTERNAL", ts + timedelta(microseconds=child_offset // 1000),
@@ -102,7 +110,7 @@ def _auth_spans(trace_id: str, parent_id: str, ts: datetime,
 
     # redis.get [session]
     cache_miss = rng.random() < (0.05 if not is_drop else 0.35)
-    redis_dur = _duration_ns(2 if not cache_miss else 12, rng=rng)
+    redis_dur = _duration_ns(2 if not cache_miss else 12, rng=rng, span_name="redis.get")
     redis_dur = int(redis_dur * lat_mult)
     redis_id = _span_id()
     spans.append(_make_span(trace_id, root_id, "auth-service: redis.get [session]",
@@ -111,7 +119,7 @@ def _auth_spans(trace_id: str, parent_id: str, ts: datetime,
                             {"db.system": "redis", "db.operation": "GET", "cache.hit": str(not cache_miss).lower()}))
 
     if cache_miss:
-        pg_dur = _duration_ns(20 if not is_drop else 60, rng=rng)
+        pg_dur = _duration_ns(20 if not is_drop else 60, rng=rng, span_name="postgres.query")
         pg_dur = int(pg_dur * lat_mult)
         spans.append(_make_span(trace_id, redis_id, "auth-service: postgres.query [users]",
                                 "auth-service", "CLIENT",
@@ -123,7 +131,7 @@ def _auth_spans(trace_id: str, parent_id: str, ts: datetime,
     total_ns += redis_dur
 
     # check_account_standing
-    standing_dur = _duration_ns(3, rng=rng)
+    standing_dur = _duration_ns(3, rng=rng, span_name="check_account_standing")
     standing_dur = int(standing_dur * lat_mult)
     standing_err = (err_override and rng.random() < err_override) or \
                    (is_drop and rng.random() < 0.08) or \
@@ -168,7 +176,7 @@ def _product_spans(trace_id: str, parent_id: str, ts: datetime,
     root_id = _span_id()
 
     # cdn.get
-    cdn_dur = _duration_ns(8, rng=rng)
+    cdn_dur = _duration_ns(8, rng=rng, span_name="cdn.get")
     cdn_dur = int(cdn_dur * lat_mult)
     spans.append(_make_span(trace_id, root_id, "product-service: cdn.get [product_images]",
                             "product-service", "CLIENT", ts, cdn_dur, "OK", region,
@@ -176,7 +184,7 @@ def _product_spans(trace_id: str, parent_id: str, ts: datetime,
     total_ns += cdn_dur
 
     # redis.get
-    redis_dur = _duration_ns(3, rng=rng)
+    redis_dur = _duration_ns(3, rng=rng, span_name="redis.get")
     redis_dur = int(redis_dur * lat_mult)
     spans.append(_make_span(trace_id, root_id, "product-service: redis.get [product_cache]",
                             "product-service", "CLIENT",
@@ -186,7 +194,7 @@ def _product_spans(trace_id: str, parent_id: str, ts: datetime,
     total_ns += redis_dur
 
     # inventory-service: get_stock
-    inv_dur = _duration_ns(10 if not is_drop else 35, rng=rng)
+    inv_dur = _duration_ns(10 if not is_drop else 35, rng=rng, span_name="redis.get")
     inv_dur = int(inv_dur * lat_mult)
     remaining = stock_tracker.get_total_stock(product["id"])
     spans.append(_make_span(trace_id, root_id, "product-service: inventory-service: get_stock",
@@ -219,14 +227,14 @@ def _draw_spans(trace_id: str, parent_id: str, ts: datetime,
     root_id = _span_id()
 
     # validate_entry_window
-    dur = _duration_ns(5, rng=rng)
+    dur = _duration_ns(5, rng=rng, span_name="validate_entry_window")
     dur = int(dur * lat_mult)
     spans.append(_make_span(trace_id, root_id, "draw-service: validate_entry_window",
                             "draw-service", "INTERNAL", ts, dur, "OK", region))
     total_ns += dur
 
     # redis dedup check
-    dedup_dur = _duration_ns(4, rng=rng)
+    dedup_dur = _duration_ns(4, rng=rng, span_name="redis.get")
     dedup_dur = int(dedup_dur * lat_mult)
     dedup_fail = rng.random() < 0.03
     spans.append(_make_span(trace_id, root_id, "draw-service: redis.get [entry_dedup]",
@@ -241,7 +249,7 @@ def _draw_spans(trace_id: str, parent_id: str, ts: datetime,
         errored = True
     else:
         # kafka.produce
-        kafka_dur = _duration_ns(15, rng=rng)
+        kafka_dur = _duration_ns(15, rng=rng, span_name="kafka.produce")
         kafka_dur = int(kafka_dur * lat_mult)
         spans.append(_make_span(trace_id, root_id, "draw-service: kafka.produce [draw_entries]",
                                 "draw-service", "PRODUCER",
@@ -251,7 +259,7 @@ def _draw_spans(trace_id: str, parent_id: str, ts: datetime,
         total_ns += kafka_dur
 
         # dynamodb.put
-        ddb_dur = _duration_ns(20, rng=rng)
+        ddb_dur = _duration_ns(20, rng=rng, span_name="dynamodb.put")
         ddb_dur = int(ddb_dur * lat_mult)
         ddb_fail = rng.random() < 0.005
         spans.append(_make_span(trace_id, root_id, "draw-service: dynamodb.put [draw_entries]",
@@ -294,7 +302,7 @@ def _inventory_reserve_spans(trace_id: str, parent_id: str, ts: datetime,
     success, remaining = stock_tracker.try_reserve(product["id"], size)
 
     # redis.decr
-    redis_dur = _duration_ns(8, rng=rng)
+    redis_dur = _duration_ns(8, rng=rng, span_name="redis.decr")
     redis_dur = int(redis_dur * lat_mult)
     redis_status = "OK" if success else "ERROR"
     spans.append(_make_span(trace_id, root_id, "inventory-service: redis.decr [stock]",
@@ -310,7 +318,7 @@ def _inventory_reserve_spans(trace_id: str, parent_id: str, ts: datetime,
         errored = True
     else:
         # postgres.update
-        pg_dur = _duration_ns(25, rng=rng)
+        pg_dur = _duration_ns(25, rng=rng, span_name="postgres.update")
         pg_dur = int(pg_dur * lat_mult)
         spans.append(_make_span(trace_id, root_id, "inventory-service: postgres.update [inventory]",
                                 "inventory-service", "CLIENT",
@@ -348,7 +356,7 @@ def _payment_spans(trace_id: str, parent_id: str, ts: datetime,
     root_id = _span_id()
 
     # validate_payment_method
-    val_dur = _duration_ns(10, rng=rng)
+    val_dur = _duration_ns(10, rng=rng, span_name="validate_payment_method")
     val_dur = int(val_dur * lat_mult)
     val_fail = rng.random() < 0.02 or (user["behavior_type"] == "new_user" and rng.random() < 0.08)
     spans.append(_make_span(trace_id, root_id, "payment-service: validate_payment_method",
@@ -362,7 +370,7 @@ def _payment_spans(trace_id: str, parent_id: str, ts: datetime,
         errored = True
     else:
         # fraud.score_check
-        fraud_dur = _duration_ns(30 if not inc_active else 80, rng=rng)
+        fraud_dur = _duration_ns(30 if not inc_active else 80, rng=rng, span_name="fraud.score_check")
         fraud_dur = int(fraud_dur * lat_mult)
         fraud_score = user["fraud_risk"] * 100 * rng.uniform(0.5, 1.5)
         fraud_score = min(100, fraud_score)
@@ -379,7 +387,7 @@ def _payment_spans(trace_id: str, parent_id: str, ts: datetime,
             errored = True
         else:
             # stripe.charge
-            stripe_dur = _duration_ns(200, rng=rng)
+            stripe_dur = _duration_ns(200, rng=rng, span_name="stripe.charge")
             stripe_dur = int(stripe_dur * lat_mult)
             stripe_fail = (err_override and rng.random() < err_override) or rng.random() < 0.03
             spans.append(_make_span(trace_id, root_id, "payment-service: stripe.charge",
@@ -395,7 +403,7 @@ def _payment_spans(trace_id: str, parent_id: str, ts: datetime,
                 errored = True
             else:
                 # postgres.insert [transactions]
-                pg_dur = _duration_ns(15, rng=rng)
+                pg_dur = _duration_ns(15, rng=rng, span_name="postgres.insert")
                 pg_dur = int(pg_dur * lat_mult)
                 spans.append(_make_span(trace_id, root_id, "payment-service: postgres.insert [transactions]",
                                         "payment-service", "CLIENT",
@@ -425,14 +433,14 @@ def _order_spans(trace_id: str, parent_id: str, ts: datetime,
     root_id = _span_id()
 
     # postgres.insert [orders]
-    pg_dur = _duration_ns(20, rng=rng)
+    pg_dur = _duration_ns(20, rng=rng, span_name="postgres.insert")
     spans.append(_make_span(trace_id, root_id, "order-service: postgres.insert [orders]",
                             "order-service", "CLIENT", ts, pg_dur, "OK", region,
                             {"db.system": "postgresql", "db.statement": "INSERT INTO orders (user_id, sku, size, amount) VALUES ($1, $2, $3, $4)"}))
     total_ns += pg_dur
 
     # kafka.produce
-    kafka_dur = _duration_ns(10, rng=rng)
+    kafka_dur = _duration_ns(10, rng=rng, span_name="kafka.produce")
     spans.append(_make_span(trace_id, root_id, "order-service: kafka.produce [order_created]",
                             "order-service", "PRODUCER",
                             ts + timedelta(microseconds=total_ns // 1000),
@@ -444,7 +452,7 @@ def _order_spans(trace_id: str, parent_id: str, ts: datetime,
     notif_id = _span_id()
 
     # apns.push
-    apns_dur = _duration_ns(50, rng=rng)
+    apns_dur = _duration_ns(50, rng=rng, span_name="apns.push")
     apns_fail = rng.random() < 0.01
     spans.append(_make_span(trace_id, notif_id, "notification-service: apns.push",
                             "notification-service", "CLIENT",
@@ -454,7 +462,7 @@ def _order_spans(trace_id: str, parent_id: str, ts: datetime,
                             status_message="APNS delivery failed" if apns_fail else ""))
 
     # ses.send_email
-    ses_dur = _duration_ns(80, rng=rng)
+    ses_dur = _duration_ns(80, rng=rng, span_name="ses.send_email")
     spans.append(_make_span(trace_id, notif_id, "notification-service: ses.send_email",
                             "notification-service", "CLIENT",
                             ts + timedelta(microseconds=(total_ns + apns_dur) // 1000),
@@ -658,7 +666,7 @@ def generate_account_check(user: dict, ts: datetime,
 
     # profile fetch
     if not auth_err:
-        profile_dur = _duration_ns(20, rng=r)
+        profile_dur = _duration_ns(20, rng=r, span_name="postgres.query")
         spans.append(_make_span(trace, root_id, "auth-service: postgres.query [profile]",
                                 "auth-service", "CLIENT",
                                 ts + timedelta(microseconds=auth_dur // 1000),
@@ -695,7 +703,7 @@ def generate_feed(user: dict, ts: datetime,
     lat_mult = incident["latency_multiplier"] if inc_active else 1.0
 
     # redis cache
-    redis_dur = _duration_ns(4, rng=r)
+    redis_dur = _duration_ns(4, rng=r, span_name="redis.get")
     redis_dur = int(redis_dur * lat_mult)
     spans.append(_make_span(trace, root_id, "feed-service: redis.get [feed_cache]",
                             "feed-service", "CLIENT", ts, redis_dur, "OK", region,
@@ -703,7 +711,7 @@ def generate_feed(user: dict, ts: datetime,
     total_ns += redis_dur
 
     # cdn fetch
-    cdn_dur = _duration_ns(30, rng=r)
+    cdn_dur = _duration_ns(30, rng=r, span_name="cdn.fetch")
     cdn_dur = int(cdn_dur * lat_mult)
     spans.append(_make_span(trace, root_id, "feed-service: cdn.fetch [images]",
                             "feed-service", "CLIENT",

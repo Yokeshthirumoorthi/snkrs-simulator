@@ -5,32 +5,35 @@ Product catalog and per-(product, size) stock tracking.
 import random
 import threading
 
-PRODUCTS = [
+from corpus_loader import get_products
+
+# Hardcoded fallback (original 24 products)
+_FALLBACK_PRODUCTS = [
     {"id": "AJ1-CHI",  "name": "Air Jordan 1 Retro High OG 'Chicago'",     "sku": "555088-101", "price": 180, "base_stock": 500,  "hype_level": 0.95},
-    {"id": "YZ-350Z",  "name": "Yeezy Boost 350 V2 'Zebra'",               "sku": "CP9654",     "price": 220, "base_stock": 300,  "hype_level": 0.90},
-    {"id": "DF-PANDA", "name": "Nike Dunk Low 'Panda'",                     "sku": "DD1391-100", "price": 110, "base_stock": 800,  "hype_level": 0.70},
-    {"id": "AF1-WHT",  "name": "Air Force 1 '07 Triple White",              "sku": "CW2288-111", "price": 90,  "base_stock": 2000, "hype_level": 0.30},
-    {"id": "AM90-INF", "name": "Air Max 90 'Infrared'",                     "sku": "CT1685-100", "price": 130, "base_stock": 600,  "hype_level": 0.65},
     {"id": "SB-TRAV",  "name": "SB Dunk Low x Travis Scott",                "sku": "CT5053-001", "price": 150, "base_stock": 200,  "hype_level": 0.98},
-    {"id": "AJ4-BRD",  "name": "Air Jordan 4 Retro 'Bred'",                "sku": "308497-060", "price": 200, "base_stock": 400,  "hype_level": 0.88},
-    {"id": "NB-550G",  "name": "New Balance 550 'Green'",                   "sku": "BB550WT1",   "price": 110, "base_stock": 700,  "hype_level": 0.55},
-    {"id": "AM1-87",   "name": "Air Max 1/87 'Big Bubble'",                 "sku": "DQ3989-100", "price": 160, "base_stock": 350,  "hype_level": 0.75},
-    {"id": "YZ-SLD",   "name": "Yeezy Slide 'Onyx'",                       "sku": "HQ6448",     "price": 70,  "base_stock": 1500, "hype_level": 0.60},
-    {"id": "AJ11-CON", "name": "Air Jordan 11 Retro 'Concord'",            "sku": "378037-100", "price": 220, "base_stock": 350,  "hype_level": 0.92},
-    {"id": "DF-LOTV",  "name": "Nike Dunk Low x Off-White 'Lot 50'",       "sku": "DM1602-001", "price": 180, "base_stock": 150,  "hype_level": 0.97},
-    {"id": "AF1-TS",   "name": "Air Force 1 Low x Travis Scott 'Cactus'",  "sku": "AQ4211-002", "price": 160, "base_stock": 250,  "hype_level": 0.96},
-    {"id": "AM97-SW",  "name": "Air Max 97/1 Sean Wotherspoon",            "sku": "AJ4219-400", "price": 160, "base_stock": 180,  "hype_level": 0.94},
-    {"id": "SB-HEIN",  "name": "SB Dunk Low 'Heineken'",                   "sku": "304292-302", "price": 130, "base_stock": 100,  "hype_level": 0.85},
-    {"id": "AJ1-UNC",  "name": "Air Jordan 1 Retro High OG 'UNC'",        "sku": "555088-117", "price": 180, "base_stock": 450,  "hype_level": 0.82},
-    {"id": "NKR-VPR",  "name": "Nike Vaporfly NEXT% 3",                    "sku": "DV4129-100", "price": 250, "base_stock": 600,  "hype_level": 0.45},
-    {"id": "AJ3-WCM",  "name": "Air Jordan 3 Retro 'White Cement'",       "sku": "DN3707-100", "price": 200, "base_stock": 400,  "hype_level": 0.86},
-    {"id": "DF-ARGN",  "name": "Nike Dunk Low 'Argon'",                    "sku": "DM0121-400", "price": 110, "base_stock": 900,  "hype_level": 0.50},
-    {"id": "AM-PLUS",  "name": "Nike Air Max Plus 'Hyper Blue'",           "sku": "BQ4629-003", "price": 175, "base_stock": 550,  "hype_level": 0.40},
+    {"id": "AF1-WHT",  "name": "Air Force 1 '07 Triple White",              "sku": "CW2288-111", "price": 90,  "base_stock": 2000, "hype_level": 0.30},
     {"id": "AJ1-TS",   "name": "Air Jordan 1 x Travis Scott 'Mocha'",     "sku": "CD4487-100", "price": 175, "base_stock": 200,  "hype_level": 0.99},
-    {"id": "SB-STSY",  "name": "SB Dunk Low x Stussy 'Cherry'",           "sku": "DO9395-600", "price": 130, "base_stock": 250,  "hype_level": 0.80},
-    {"id": "AJ5-OW",   "name": "Air Jordan 5 x Off-White 'Sail'",         "sku": "DH8565-100", "price": 225, "base_stock": 300,  "hype_level": 0.93},
-    {"id": "NB-2002R", "name": "New Balance 2002R 'Protection Pack'",      "sku": "M2002RDB",   "price": 130, "base_stock": 650,  "hype_level": 0.58},
+    {"id": "DF-PANDA", "name": "Nike Dunk Low 'Panda'",                     "sku": "DD1391-100", "price": 110, "base_stock": 800,  "hype_level": 0.70},
+    {"id": "YZ-350Z",  "name": "Yeezy Boost 350 V2 'Zebra'",               "sku": "CP9654",     "price": 220, "base_stock": 300,  "hype_level": 0.90},
 ]
+
+# Load from corpus, normalize fields for backward compat
+_raw_products = get_products(fallback=_FALLBACK_PRODUCTS)
+PRODUCTS = []
+for p in _raw_products:
+    PRODUCTS.append({
+        "id": p["id"],
+        "name": p["name"],
+        "sku": p["sku"],
+        "price": p["price"],
+        "base_stock": p.get("base_stock", 500),
+        "hype_level": p.get("hype_level", 0.5),
+        "category": p.get("category", "lifestyle"),
+        "release_type": p.get("release_type", "general_release"),
+        "brand": p.get("brand", "Nike"),
+        "collab": p.get("collab"),
+        "colorway": p.get("colorway", ""),
+    })
 
 SIZES = ["6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "13", "14"]
 

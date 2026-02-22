@@ -1,0 +1,1021 @@
+[
+  {
+    "name": "connection_pool_exhaustion_shipping",
+    "description": "shipping-service connection pool exhausted",
+    "affected_service": "shipping-service",
+    "affected_endpoints": [
+      "GET /v1/feed",
+      "GET /v1/shipping/status",
+      "GET /v1/account/profile",
+      "GET /v1/recommendations"
+    ],
+    "error_rate_override": 0.25,
+    "latency_multiplier": 3.2,
+    "duration_fraction": 0.26,
+    "error_message": "Connection pool exhausted: max connections reached (52/52)",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "connection_pool_exhaustion_auth",
+    "description": "auth-service connection pool exhausted",
+    "affected_service": "auth-service",
+    "affected_endpoints": [
+      "GET /v1/feed",
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.24,
+    "latency_multiplier": 3.5,
+    "duration_fraction": 0.2,
+    "error_message": "Connection pool exhausted: max connections reached (26/26)",
+    "progression": "oscillating",
+    "cascades_to": [
+      "returns-service",
+      "feed-service"
+    ]
+  },
+  {
+    "name": "connection_pool_exhaustion_payment",
+    "description": "payment-service connection pool exhausted",
+    "affected_service": "payment-service",
+    "affected_endpoints": [
+      "GET /v1/recommendations",
+      "GET /v1/shipping/status",
+      "GET /v1/feed",
+      "POST /v1/wishlist"
+    ],
+    "error_rate_override": 0.33,
+    "latency_multiplier": 3.3,
+    "duration_fraction": 0.29,
+    "error_message": "Connection pool exhausted: max connections reached (40/40)",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "connection_pool_exhaustion_notification",
+    "description": "notification-service connection pool exhausted",
+    "affected_service": "notification-service",
+    "affected_endpoints": [
+      "POST /v1/returns",
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.27,
+    "latency_multiplier": 3.7,
+    "duration_fraction": 0.22,
+    "error_message": "Connection pool exhausted: max connections reached (93/93)",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "memory_leak_wishlist",
+    "description": "Memory leak in wishlist-service causing GC pressure",
+    "affected_service": "wishlist-service",
+    "affected_endpoints": [
+      "POST /v1/checkout",
+      "GET /v1/shipping/status",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.09,
+    "latency_multiplier": 6.4,
+    "duration_fraction": 0.46,
+    "error_message": "OutOfMemoryError: Java heap space in wishlist-service",
+    "progression": "oscillating",
+    "cascades_to": []
+  },
+  {
+    "name": "memory_leak_order",
+    "description": "Memory leak in order-service causing GC pressure",
+    "affected_service": "order-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}",
+      "POST /v1/returns",
+      "GET /v1/recommendations",
+      "GET /v1/shipping/status"
+    ],
+    "error_rate_override": 0.1,
+    "latency_multiplier": 4.9,
+    "duration_fraction": 0.45,
+    "error_message": "OutOfMemoryError: Java heap space in order-service",
+    "progression": "ramp_up",
+    "cascades_to": [
+      "payment-service"
+    ]
+  },
+  {
+    "name": "memory_leak_returns",
+    "description": "Memory leak in returns-service causing GC pressure",
+    "affected_service": "returns-service",
+    "affected_endpoints": [
+      "GET /v1/account/profile",
+      "GET /v1/feed",
+      "GET /v1/products/{id}"
+    ],
+    "error_rate_override": 0.17,
+    "latency_multiplier": 4.7,
+    "duration_fraction": 0.49,
+    "error_message": "OutOfMemoryError: Java heap space in returns-service",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "memory_leak_notification",
+    "description": "Memory leak in notification-service causing GC pressure",
+    "affected_service": "notification-service",
+    "affected_endpoints": [
+      "POST /v1/draw/enter",
+      "GET /v1/products/{id}",
+      "POST /v1/returns",
+      "GET /v1/feed"
+    ],
+    "error_rate_override": 0.11,
+    "latency_multiplier": 4.3,
+    "duration_fraction": 0.45,
+    "error_message": "OutOfMemoryError: Java heap space in notification-service",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "dns_resolution_failure_payment",
+    "description": "DNS resolution failure for payment-service",
+    "affected_service": "payment-service",
+    "affected_endpoints": [
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.36,
+    "latency_multiplier": 5.9,
+    "duration_fraction": 0.13,
+    "error_message": "DNS resolution failed: NXDOMAIN for payment-service.internal",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "dns_resolution_failure_inventory",
+    "description": "DNS resolution failure for inventory-service",
+    "affected_service": "inventory-service",
+    "affected_endpoints": [
+      "POST /v1/returns",
+      "GET /v1/account/profile",
+      "POST /v1/draw/enter",
+      "GET /v1/search"
+    ],
+    "error_rate_override": 0.24,
+    "latency_multiplier": 8.6,
+    "duration_fraction": 0.13,
+    "error_message": "DNS resolution failed: NXDOMAIN for inventory-service.internal",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "dns_resolution_failure_search",
+    "description": "DNS resolution failure for search-service",
+    "affected_service": "search-service",
+    "affected_endpoints": [
+      "GET /v1/recommendations",
+      "GET /v1/search"
+    ],
+    "error_rate_override": 0.31,
+    "latency_multiplier": 7.9,
+    "duration_fraction": 0.15,
+    "error_message": "DNS resolution failed: NXDOMAIN for search-service.internal",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "dns_resolution_failure_shipping",
+    "description": "DNS resolution failure for shipping-service",
+    "affected_service": "shipping-service",
+    "affected_endpoints": [
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.36,
+    "latency_multiplier": 6.0,
+    "duration_fraction": 0.15,
+    "error_message": "DNS resolution failed: NXDOMAIN for shipping-service.internal",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "tls_cert_expiry_wishlist",
+    "description": "TLS certificate expiry for wishlist-service",
+    "affected_service": "wishlist-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}",
+      "GET /v1/search"
+    ],
+    "error_rate_override": 0.47,
+    "latency_multiplier": 2.2,
+    "duration_fraction": 0.33,
+    "error_message": "SSL: CERTIFICATE_VERIFY_FAILED for wishlist-service.internal:443",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "tls_cert_expiry_feed",
+    "description": "TLS certificate expiry for feed-service",
+    "affected_service": "feed-service",
+    "affected_endpoints": [
+      "POST /v1/checkout",
+      "GET /v1/recommendations",
+      "GET /v1/products/{id}",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.53,
+    "latency_multiplier": 2.1,
+    "duration_fraction": 0.32,
+    "error_message": "SSL: CERTIFICATE_VERIFY_FAILED for feed-service.internal:443",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "tls_cert_expiry_analytics",
+    "description": "TLS certificate expiry for analytics-service",
+    "affected_service": "analytics-service",
+    "affected_endpoints": [
+      "GET /v1/account/profile",
+      "POST /v1/checkout",
+      "GET /v1/feed",
+      "GET /v1/shipping/status"
+    ],
+    "error_rate_override": 0.28,
+    "latency_multiplier": 2.6,
+    "duration_fraction": 0.35,
+    "error_message": "SSL: CERTIFICATE_VERIFY_FAILED for analytics-service.internal:443",
+    "progression": "instant",
+    "cascades_to": [
+      "payment-service",
+      "shipping-service"
+    ]
+  },
+  {
+    "name": "tls_cert_expiry_draw",
+    "description": "TLS certificate expiry for draw-service",
+    "affected_service": "draw-service",
+    "affected_endpoints": [
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.63,
+    "latency_multiplier": 2.3,
+    "duration_fraction": 0.36,
+    "error_message": "SSL: CERTIFICATE_VERIFY_FAILED for draw-service.internal:443",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "kafka_rebalance_payment",
+    "description": "Kafka consumer group rebalancing in payment-service",
+    "affected_service": "payment-service",
+    "affected_endpoints": [
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.15,
+    "latency_multiplier": 3.7,
+    "duration_fraction": 0.17,
+    "error_message": "Consumer group rebalancing: partitions revoked for payment-service",
+    "progression": "ramp_up",
+    "cascades_to": [
+      "auth-service",
+      "product-service"
+    ]
+  },
+  {
+    "name": "kafka_rebalance_order",
+    "description": "Kafka consumer group rebalancing in order-service",
+    "affected_service": "order-service",
+    "affected_endpoints": [
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.12,
+    "latency_multiplier": 3.8,
+    "duration_fraction": 0.19,
+    "error_message": "Consumer group rebalancing: partitions revoked for order-service",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "kafka_rebalance_notification",
+    "description": "Kafka consumer group rebalancing in notification-service",
+    "affected_service": "notification-service",
+    "affected_endpoints": [
+      "GET /v1/search",
+      "GET /v1/products/{id}",
+      "GET /v1/account/profile",
+      "POST /v1/draw/enter"
+    ],
+    "error_rate_override": 0.12,
+    "latency_multiplier": 3.1,
+    "duration_fraction": 0.22,
+    "error_message": "Consumer group rebalancing: partitions revoked for notification-service",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "kafka_rebalance_wishlist",
+    "description": "Kafka consumer group rebalancing in wishlist-service",
+    "affected_service": "wishlist-service",
+    "affected_endpoints": [
+      "GET /v1/feed"
+    ],
+    "error_rate_override": 0.05,
+    "latency_multiplier": 4.2,
+    "duration_fraction": 0.22,
+    "error_message": "Consumer group rebalancing: partitions revoked for wishlist-service",
+    "progression": "instant",
+    "cascades_to": [
+      "search-service"
+    ]
+  },
+  {
+    "name": "redis_eviction_storm_draw",
+    "description": "Redis eviction storm affecting draw-service cache",
+    "affected_service": "draw-service",
+    "affected_endpoints": [
+      "POST /v1/returns",
+      "GET /v1/feed"
+    ],
+    "error_rate_override": 0.32,
+    "latency_multiplier": 4.7,
+    "duration_fraction": 0.42,
+    "error_message": "Redis maxmemory reached: evicting keys for draw-service cache",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "redis_eviction_storm_shipping",
+    "description": "Redis eviction storm affecting shipping-service cache",
+    "affected_service": "shipping-service",
+    "affected_endpoints": [
+      "GET /v1/shipping/status",
+      "GET /v1/search",
+      "GET /v1/feed"
+    ],
+    "error_rate_override": 0.16,
+    "latency_multiplier": 6.6,
+    "duration_fraction": 0.31,
+    "error_message": "Redis maxmemory reached: evicting keys for shipping-service cache",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "redis_eviction_storm_api_gateway",
+    "description": "Redis eviction storm affecting api-gateway cache",
+    "affected_service": "api-gateway",
+    "affected_endpoints": [
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.34,
+    "latency_multiplier": 7.5,
+    "duration_fraction": 0.37,
+    "error_message": "Redis maxmemory reached: evicting keys for api-gateway cache",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "redis_eviction_storm_order",
+    "description": "Redis eviction storm affecting order-service cache",
+    "affected_service": "order-service",
+    "affected_endpoints": [
+      "POST /v1/checkout",
+      "GET /v1/search",
+      "POST /v1/wishlist",
+      "GET /v1/recommendations"
+    ],
+    "error_rate_override": 0.3,
+    "latency_multiplier": 5.7,
+    "duration_fraction": 0.32,
+    "error_message": "Redis maxmemory reached: evicting keys for order-service cache",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "thread_pool_exhaustion_returns",
+    "description": "Thread pool exhaustion in returns-service",
+    "affected_service": "returns-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}",
+      "GET /v1/recommendations",
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.51,
+    "latency_multiplier": 4.1,
+    "duration_fraction": 0.17,
+    "error_message": "Thread pool exhausted: 48/48 threads busy in returns-service",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "thread_pool_exhaustion_feed",
+    "description": "Thread pool exhaustion in feed-service",
+    "affected_service": "feed-service",
+    "affected_endpoints": [
+      "GET /v1/search",
+      "POST /v1/draw/enter"
+    ],
+    "error_rate_override": 0.47,
+    "latency_multiplier": 3.0,
+    "duration_fraction": 0.22,
+    "error_message": "Thread pool exhausted: 52/52 threads busy in feed-service",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "thread_pool_exhaustion_notification",
+    "description": "Thread pool exhaustion in notification-service",
+    "affected_service": "notification-service",
+    "affected_endpoints": [
+      "POST /v1/wishlist",
+      "POST /v1/checkout",
+      "POST /v1/draw/enter"
+    ],
+    "error_rate_override": 0.25,
+    "latency_multiplier": 3.3,
+    "duration_fraction": 0.23,
+    "error_message": "Thread pool exhausted: 26/26 threads busy in notification-service",
+    "progression": "ramp_down",
+    "cascades_to": [
+      "returns-service",
+      "shipping-service",
+      "search-service"
+    ]
+  },
+  {
+    "name": "thread_pool_exhaustion_draw",
+    "description": "Thread pool exhaustion in draw-service",
+    "affected_service": "draw-service",
+    "affected_endpoints": [
+      "GET /v1/feed",
+      "POST /v1/draw/enter"
+    ],
+    "error_rate_override": 0.44,
+    "latency_multiplier": 5.0,
+    "duration_fraction": 0.22,
+    "error_message": "Thread pool exhausted: 21/21 threads busy in draw-service",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "gc_stop_the_world_order",
+    "description": "Long GC pause in order-service",
+    "affected_service": "order-service",
+    "affected_endpoints": [
+      "GET /v1/recommendations",
+      "POST /v1/returns",
+      "GET /v1/search",
+      "GET /v1/products/{id}"
+    ],
+    "error_rate_override": 0.26,
+    "latency_multiplier": 11.3,
+    "duration_fraction": 0.11,
+    "error_message": "GC pause exceeded 5s: Full GC triggered in order-service",
+    "progression": "ramp_down",
+    "cascades_to": [
+      "feed-service",
+      "analytics-service",
+      "auth-service"
+    ]
+  },
+  {
+    "name": "gc_stop_the_world_draw",
+    "description": "Long GC pause in draw-service",
+    "affected_service": "draw-service",
+    "affected_endpoints": [
+      "GET /v1/search",
+      "POST /v1/wishlist",
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.14,
+    "latency_multiplier": 7.9,
+    "duration_fraction": 0.09,
+    "error_message": "GC pause exceeded 5s: Full GC triggered in draw-service",
+    "progression": "oscillating",
+    "cascades_to": []
+  },
+  {
+    "name": "gc_stop_the_world_feed",
+    "description": "Long GC pause in feed-service",
+    "affected_service": "feed-service",
+    "affected_endpoints": [
+      "GET /v1/account/profile",
+      "GET /v1/products/{id}",
+      "GET /v1/feed",
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.21,
+    "latency_multiplier": 12.7,
+    "duration_fraction": 0.09,
+    "error_message": "GC pause exceeded 5s: Full GC triggered in feed-service",
+    "progression": "spike",
+    "cascades_to": [
+      "analytics-service",
+      "draw-service",
+      "notification-service"
+    ]
+  },
+  {
+    "name": "gc_stop_the_world_payment",
+    "description": "Long GC pause in payment-service",
+    "affected_service": "payment-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}",
+      "GET /v1/search",
+      "GET /v1/shipping/status",
+      "POST /v1/draw/enter"
+    ],
+    "error_rate_override": 0.2,
+    "latency_multiplier": 12.5,
+    "duration_fraction": 0.1,
+    "error_message": "GC pause exceeded 5s: Full GC triggered in payment-service",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "disk_full_feed",
+    "description": "Disk full on feed-service pod",
+    "affected_service": "feed-service",
+    "affected_endpoints": [
+      "POST /v1/wishlist"
+    ],
+    "error_rate_override": 0.39,
+    "latency_multiplier": 0.8,
+    "duration_fraction": 0.15,
+    "error_message": "No space left on device: /var/log full on feed-service",
+    "progression": "instant",
+    "cascades_to": [
+      "draw-service",
+      "auth-service",
+      "returns-service"
+    ]
+  },
+  {
+    "name": "disk_full_api_gateway",
+    "description": "Disk full on api-gateway pod",
+    "affected_service": "api-gateway",
+    "affected_endpoints": [
+      "GET /v1/recommendations",
+      "POST /v1/checkout",
+      "POST /v1/returns",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.31,
+    "latency_multiplier": 1.0,
+    "duration_fraction": 0.14,
+    "error_message": "No space left on device: /var/log full on api-gateway",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "disk_full_auth",
+    "description": "Disk full on auth-service pod",
+    "affected_service": "auth-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}",
+      "POST /v1/draw/enter",
+      "POST /v1/returns",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.62,
+    "latency_multiplier": 1.2,
+    "duration_fraction": 0.14,
+    "error_message": "No space left on device: /var/log full on auth-service",
+    "progression": "spike",
+    "cascades_to": [
+      "recommendation-service"
+    ]
+  },
+  {
+    "name": "disk_full_recommendation",
+    "description": "Disk full on recommendation-service pod",
+    "affected_service": "recommendation-service",
+    "affected_endpoints": [
+      "POST /v1/wishlist",
+      "GET /v1/recommendations",
+      "GET /v1/feed"
+    ],
+    "error_rate_override": 0.44,
+    "latency_multiplier": 1.1,
+    "duration_fraction": 0.17,
+    "error_message": "No space left on device: /var/log full on recommendation-service",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "network_partition_auth",
+    "description": "Network partition isolating auth-service",
+    "affected_service": "auth-service",
+    "affected_endpoints": [
+      "POST /v1/checkout",
+      "GET /v1/shipping/status",
+      "GET /v1/products/{id}",
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.75,
+    "latency_multiplier": 1.2,
+    "duration_fraction": 0.21,
+    "error_message": "Network unreachable: auth-service isolated from cluster",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "network_partition_order",
+    "description": "Network partition isolating order-service",
+    "affected_service": "order-service",
+    "affected_endpoints": [
+      "GET /v1/feed"
+    ],
+    "error_rate_override": 0.44,
+    "latency_multiplier": 0.7,
+    "duration_fraction": 0.23,
+    "error_message": "Network unreachable: order-service isolated from cluster",
+    "progression": "oscillating",
+    "cascades_to": [
+      "recommendation-service",
+      "feed-service",
+      "inventory-service"
+    ]
+  },
+  {
+    "name": "network_partition_wishlist",
+    "description": "Network partition isolating wishlist-service",
+    "affected_service": "wishlist-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}"
+    ],
+    "error_rate_override": 0.65,
+    "latency_multiplier": 1.3,
+    "duration_fraction": 0.21,
+    "error_message": "Network unreachable: wishlist-service isolated from cluster",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "network_partition_returns",
+    "description": "Network partition isolating returns-service",
+    "affected_service": "returns-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}",
+      "GET /v1/feed",
+      "POST /v1/wishlist"
+    ],
+    "error_rate_override": 0.83,
+    "latency_multiplier": 0.9,
+    "duration_fraction": 0.22,
+    "error_message": "Network unreachable: returns-service isolated from cluster",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "config_drift_feed",
+    "description": "Configuration drift detected in feed-service",
+    "affected_service": "feed-service",
+    "affected_endpoints": [
+      "GET /v1/feed",
+      "POST /v1/draw/enter",
+      "GET /v1/search",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.22,
+    "latency_multiplier": 1.9,
+    "duration_fraction": 0.44,
+    "error_message": "Config version mismatch: expected v42 got v41 in feed-service",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "config_drift_shipping",
+    "description": "Configuration drift detected in shipping-service",
+    "affected_service": "shipping-service",
+    "affected_endpoints": [
+      "GET /v1/recommendations",
+      "GET /v1/feed",
+      "GET /v1/search",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.14,
+    "latency_multiplier": 2.2,
+    "duration_fraction": 0.43,
+    "error_message": "Config version mismatch: expected v42 got v41 in shipping-service",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "config_drift_payment",
+    "description": "Configuration drift detected in payment-service",
+    "affected_service": "payment-service",
+    "affected_endpoints": [
+      "GET /v1/feed",
+      "POST /v1/draw/enter",
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.17,
+    "latency_multiplier": 2.3,
+    "duration_fraction": 0.37,
+    "error_message": "Config version mismatch: expected v42 got v41 in payment-service",
+    "progression": "instant",
+    "cascades_to": [
+      "returns-service",
+      "wishlist-service"
+    ]
+  },
+  {
+    "name": "config_drift_api_gateway",
+    "description": "Configuration drift detected in api-gateway",
+    "affected_service": "api-gateway",
+    "affected_endpoints": [
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.19,
+    "latency_multiplier": 1.5,
+    "duration_fraction": 0.33,
+    "error_message": "Config version mismatch: expected v42 got v41 in api-gateway",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "dependency_cascade_notification",
+    "description": "Cascading failure from notification-service dependency",
+    "affected_service": "notification-service",
+    "affected_endpoints": [
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.39,
+    "latency_multiplier": 9.7,
+    "duration_fraction": 0.28,
+    "error_message": "Circuit breaker OPEN: notification-service dependency unreachable",
+    "progression": "spike",
+    "cascades_to": [
+      "auth-service",
+      "recommendation-service",
+      "wishlist-service"
+    ]
+  },
+  {
+    "name": "dependency_cascade_feed",
+    "description": "Cascading failure from feed-service dependency",
+    "affected_service": "feed-service",
+    "affected_endpoints": [
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.44,
+    "latency_multiplier": 8.3,
+    "duration_fraction": 0.3,
+    "error_message": "Circuit breaker OPEN: feed-service dependency unreachable",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "dependency_cascade_wishlist",
+    "description": "Cascading failure from wishlist-service dependency",
+    "affected_service": "wishlist-service",
+    "affected_endpoints": [
+      "GET /v1/account/profile",
+      "GET /v1/shipping/status"
+    ],
+    "error_rate_override": 0.2,
+    "latency_multiplier": 6.9,
+    "duration_fraction": 0.32,
+    "error_message": "Circuit breaker OPEN: wishlist-service dependency unreachable",
+    "progression": "instant",
+    "cascades_to": [
+      "auth-service"
+    ]
+  },
+  {
+    "name": "dependency_cascade_returns",
+    "description": "Cascading failure from returns-service dependency",
+    "affected_service": "returns-service",
+    "affected_endpoints": [
+      "GET /v1/feed",
+      "GET /v1/recommendations",
+      "GET /v1/shipping/status"
+    ],
+    "error_rate_override": 0.19,
+    "latency_multiplier": 5.6,
+    "duration_fraction": 0.34,
+    "error_message": "Circuit breaker OPEN: returns-service dependency unreachable",
+    "progression": "oscillating",
+    "cascades_to": []
+  },
+  {
+    "name": "split_brain_order",
+    "description": "Split-brain scenario in order-service cluster",
+    "affected_service": "order-service",
+    "affected_endpoints": [
+      "GET /v1/shipping/status",
+      "GET /v1/products/{id}",
+      "GET /v1/account/profile",
+      "POST /v1/returns"
+    ],
+    "error_rate_override": 0.6,
+    "latency_multiplier": 3.0,
+    "duration_fraction": 0.22,
+    "error_message": "Split-brain detected: multiple leaders in order-service cluster",
+    "progression": "spike",
+    "cascades_to": []
+  },
+  {
+    "name": "split_brain_returns",
+    "description": "Split-brain scenario in returns-service cluster",
+    "affected_service": "returns-service",
+    "affected_endpoints": [
+      "GET /v1/recommendations",
+      "GET /v1/feed",
+      "GET /v1/search"
+    ],
+    "error_rate_override": 0.66,
+    "latency_multiplier": 2.8,
+    "duration_fraction": 0.21,
+    "error_message": "Split-brain detected: multiple leaders in returns-service cluster",
+    "progression": "oscillating",
+    "cascades_to": []
+  },
+  {
+    "name": "split_brain_payment",
+    "description": "Split-brain scenario in payment-service cluster",
+    "affected_service": "payment-service",
+    "affected_endpoints": [
+      "POST /v1/returns",
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.48,
+    "latency_multiplier": 3.4,
+    "duration_fraction": 0.24,
+    "error_message": "Split-brain detected: multiple leaders in payment-service cluster",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "split_brain_notification",
+    "description": "Split-brain scenario in notification-service cluster",
+    "affected_service": "notification-service",
+    "affected_endpoints": [
+      "GET /v1/recommendations",
+      "GET /v1/products/{id}",
+      "GET /v1/account/profile",
+      "POST /v1/draw/enter"
+    ],
+    "error_rate_override": 0.46,
+    "latency_multiplier": 2.8,
+    "duration_fraction": 0.24,
+    "error_message": "Split-brain detected: multiple leaders in notification-service cluster",
+    "progression": "oscillating",
+    "cascades_to": [
+      "returns-service"
+    ]
+  },
+  {
+    "name": "hot_partition_notification",
+    "description": "Hot partition in notification-service database",
+    "affected_service": "notification-service",
+    "affected_endpoints": [
+      "POST /v1/returns",
+      "POST /v1/checkout",
+      "GET /v1/search",
+      "GET /v1/recommendations"
+    ],
+    "error_rate_override": 0.21,
+    "latency_multiplier": 7.6,
+    "duration_fraction": 0.25,
+    "error_message": "Partition key hotspot detected: shard overloaded in notification-service",
+    "progression": "ramp_up",
+    "cascades_to": []
+  },
+  {
+    "name": "hot_partition_search",
+    "description": "Hot partition in search-service database",
+    "affected_service": "search-service",
+    "affected_endpoints": [
+      "GET /v1/shipping/status",
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.23,
+    "latency_multiplier": 7.6,
+    "duration_fraction": 0.36,
+    "error_message": "Partition key hotspot detected: shard overloaded in search-service",
+    "progression": "ramp_down",
+    "cascades_to": []
+  },
+  {
+    "name": "hot_partition_order",
+    "description": "Hot partition in order-service database",
+    "affected_service": "order-service",
+    "affected_endpoints": [
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.25,
+    "latency_multiplier": 7.2,
+    "duration_fraction": 0.32,
+    "error_message": "Partition key hotspot detected: shard overloaded in order-service",
+    "progression": "ramp_up",
+    "cascades_to": [
+      "search-service"
+    ]
+  },
+  {
+    "name": "hot_partition_feed",
+    "description": "Hot partition in feed-service database",
+    "affected_service": "feed-service",
+    "affected_endpoints": [
+      "POST /v1/wishlist",
+      "GET /v1/recommendations",
+      "GET /v1/products/{id}"
+    ],
+    "error_rate_override": 0.1,
+    "latency_multiplier": 5.3,
+    "duration_fraction": 0.29,
+    "error_message": "Partition key hotspot detected: shard overloaded in feed-service",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "connection_pool_exhaustion",
+    "description": "Payment service connection pool exhausted",
+    "affected_service": "payment-service",
+    "affected_endpoints": [
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.4,
+    "latency_multiplier": 3.0,
+    "duration_fraction": 0.25,
+    "error_message": "Connection pool exhausted: max connections reached (50/50)",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "inventory_race_condition",
+    "description": "Overselling due to race condition \u2014 stock goes negative",
+    "affected_service": "inventory-service",
+    "affected_endpoints": [
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.15,
+    "latency_multiplier": 2.0,
+    "duration_fraction": 0.4,
+    "error_message": "Inventory consistency error: stock negative after concurrent decrement",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "bot_storm",
+    "description": "Bot storm triggers auth-service rate limiting",
+    "affected_service": "auth-service",
+    "affected_endpoints": [
+      "POST /v1/draw/enter",
+      "POST /v1/checkout"
+    ],
+    "error_rate_override": 0.3,
+    "latency_multiplier": 1.5,
+    "duration_fraction": 0.5,
+    "error_message": "Request blocked: bot detection triggered (fingerprint mismatch)",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "cdn_outage",
+    "description": "CDN provider experiencing regional outage",
+    "affected_service": "product-service",
+    "affected_endpoints": [
+      "GET /v1/products/{id}",
+      "GET /v1/feed"
+    ],
+    "error_rate_override": 0.2,
+    "latency_multiplier": 10.0,
+    "duration_fraction": 0.35,
+    "error_message": "CDN timeout: upstream provider returned 504 after 30s",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "database_failover",
+    "description": "Primary DB failover to replica \u2014 3s latency spike",
+    "affected_service": "all",
+    "affected_endpoints": [
+      "POST /v1/checkout",
+      "POST /v1/draw/enter",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 0.1,
+    "latency_multiplier": 15.0,
+    "duration_fraction": 0.1,
+    "error_message": "Database failover in progress: read-only replica promoted, connections draining",
+    "progression": "instant",
+    "cascades_to": []
+  },
+  {
+    "name": "regional_outage",
+    "description": "Complete regional outage in eu-west",
+    "affected_service": "all",
+    "affected_region": "eu-west",
+    "affected_endpoints": [
+      "POST /v1/checkout",
+      "POST /v1/draw/enter",
+      "GET /v1/products/{id}",
+      "GET /v1/feed",
+      "GET /v1/account/profile"
+    ],
+    "error_rate_override": 1.0,
+    "latency_multiplier": 1.0,
+    "duration_fraction": 0.45,
+    "error_message": "Regional infrastructure failure: eu-west-1 availability zone unreachable",
+    "progression": "instant",
+    "cascades_to": []
+  }
+]

@@ -2,7 +2,119 @@
 Behavioral patterns per user type — session templates with timing, error rates, branching.
 """
 
+from corpus_loader import get_incidents as _load_incidents_corpus
+
 PATTERNS = {
+    # New behavior types (Phase 2d)
+    "loyal_collector": {
+        "pre_drop": [
+            ("GET /v1/feed",             {"latency_ms": 30,  "error_rate": 0.003}),
+            ("GET /v1/products/{id}",    {"latency_ms": 80,  "error_rate": 0.008, "repeat": (2, 6)}),
+            ("GET /v1/account/profile",  {"latency_ms": 50,  "error_rate": 0.005}),
+        ],
+        "drop_live": [
+            ("POST /v1/draw/enter",      {"latency_ms": 150, "error_rate": 0.03, "retry": 3}),
+            ("POST /v1/checkout",        {"latency_ms": 600, "error_rate": 0.05}),
+        ],
+        "post_drop": [
+            ("GET /v1/account/profile",  {"latency_ms": 45,  "error_rate": 0.005}),
+            ("GET /v1/feed",             {"latency_ms": 30,  "error_rate": 0.003}),
+        ],
+        "session_gap_ms": (500, 3000),
+        "sessions_per_drop": (1, 4),
+        "checkout_probability": 0.80,
+    },
+
+    "deal_hunter": {
+        "pre_drop": [
+            ("GET /v1/feed",             {"latency_ms": 35,  "error_rate": 0.005}),
+            ("GET /v1/products/{id}",    {"latency_ms": 100, "error_rate": 0.01, "repeat": (3, 8)}),
+        ],
+        "drop_live": [
+            ("GET /v1/products/{id}",    {"latency_ms": 120, "error_rate": 0.02, "repeat": (2, 5)}),
+            ("POST /v1/checkout",        {"latency_ms": 700, "error_rate": 0.10, "probability": 0.40}),
+        ],
+        "post_drop": [
+            ("GET /v1/products/{id}",    {"latency_ms": 90,  "error_rate": 0.01, "repeat": (1, 3)}),
+            ("GET /v1/feed",             {"latency_ms": 30,  "error_rate": 0.003}),
+        ],
+        "session_gap_ms": (1000, 5000),
+        "sessions_per_drop": (2, 5),
+        "checkout_probability": 0.25,
+    },
+
+    "international_buyer": {
+        "pre_drop": [
+            ("GET /v1/account/profile",  {"latency_ms": 150, "error_rate": 0.03}),
+            ("GET /v1/products/{id}",    {"latency_ms": 200, "error_rate": 0.04, "repeat": (1, 3)}),
+        ],
+        "drop_live": [
+            ("POST /v1/draw/enter",      {"latency_ms": 350, "error_rate": 0.12}),
+            ("POST /v1/checkout",        {"latency_ms": 1500, "error_rate": 0.15}),
+        ],
+        "post_drop": [
+            ("GET /v1/account/profile",  {"latency_ms": 120, "error_rate": 0.02}),
+        ],
+        "session_gap_ms": (2000, 10000),
+        "sessions_per_drop": (1, 2),
+        "checkout_probability": 0.50,
+    },
+
+    "corporate_gifter": {
+        "pre_drop": [
+            ("GET /v1/products/{id}",    {"latency_ms": 100, "error_rate": 0.01, "repeat": (3, 10)}),
+            ("GET /v1/account/profile",  {"latency_ms": 60,  "error_rate": 0.01}),
+        ],
+        "drop_live": [
+            ("POST /v1/checkout",        {"latency_ms": 900, "error_rate": 0.06, "repeat": (2, 5)}),
+        ],
+        "post_drop": [
+            ("GET /v1/account/profile",  {"latency_ms": 50,  "error_rate": 0.01}),
+        ],
+        "session_gap_ms": (500, 2000),
+        "sessions_per_drop": (1, 3),
+        "checkout_probability": 0.90,
+    },
+
+    "returning_customer": {
+        "pre_drop": [
+            ("GET /v1/feed",             {"latency_ms": 35,  "error_rate": 0.003}),
+            ("GET /v1/account/profile",  {"latency_ms": 55,  "error_rate": 0.008}),
+            ("GET /v1/products/{id}",    {"latency_ms": 90,  "error_rate": 0.01, "repeat": (1, 3)}),
+        ],
+        "drop_live": [
+            ("POST /v1/draw/enter",      {"latency_ms": 180, "error_rate": 0.04}),
+            ("POST /v1/checkout",        {"latency_ms": 650, "error_rate": 0.06}),
+        ],
+        "post_drop": [
+            ("GET /v1/account/profile",  {"latency_ms": 50,  "error_rate": 0.005}),
+            ("GET /v1/feed",             {"latency_ms": 30,  "error_rate": 0.003}),
+        ],
+        "session_gap_ms": (1000, 4000),
+        "sessions_per_drop": (1, 3),
+        "checkout_probability": 0.60,
+    },
+
+    "mobile_power_user": {
+        "pre_drop": [
+            ("GET /v1/feed",             {"latency_ms": 25,  "error_rate": 0.002}),
+            ("GET /v1/products/{id}",    {"latency_ms": 70,  "error_rate": 0.01, "repeat": (2, 6)}),
+            ("GET /v1/account/profile",  {"latency_ms": 40,  "error_rate": 0.005}),
+        ],
+        "drop_live": [
+            ("POST /v1/draw/enter",      {"latency_ms": 100, "error_rate": 0.03, "retry": 4}),
+            ("POST /v1/checkout",        {"latency_ms": 500, "error_rate": 0.04}),
+        ],
+        "post_drop": [
+            ("GET /v1/feed",             {"latency_ms": 25,  "error_rate": 0.002}),
+            ("GET /v1/account/profile",  {"latency_ms": 35,  "error_rate": 0.003}),
+        ],
+        "session_gap_ms": (200, 1500),
+        "sessions_per_drop": (2, 6),
+        "checkout_probability": 0.65,
+    },
+
+    # Original behavior types
     "casual_browser": {
         "pre_drop": [
             ("GET /v1/feed",             {"latency_ms": 40,  "error_rate": 0.005}),
@@ -93,9 +205,9 @@ PATTERNS = {
 }
 
 
-# ── Incident types injected every Nth drop ──────────────────────────────
+# ── Incident types — loaded from corpus ──────────────────────────────────
 
-INCIDENTS = [
+_FALLBACK_INCIDENTS = [
     {
         "name": "connection_pool_exhaustion",
         "description": "Payment service connection pool exhausted",
@@ -103,7 +215,7 @@ INCIDENTS = [
         "affected_endpoints": ["POST /v1/checkout"],
         "error_rate_override": 0.40,
         "latency_multiplier": 3.0,
-        "duration_fraction": 0.25,  # affects 25% of the drop window
+        "duration_fraction": 0.25,
         "error_message": "Connection pool exhausted: max connections reached (50/50)",
     },
     {
@@ -159,13 +271,35 @@ INCIDENTS = [
     },
 ]
 
+INCIDENTS = _load_incidents_corpus(fallback=_FALLBACK_INCIDENTS)
 
-def get_incident_for_drop(drop_index: int) -> dict | None:
-    """Return an incident for this drop, or None. Every 5th drop gets one."""
-    if drop_index % 5 != 3:  # drops 3, 8, 13, 18, ...
+# Normalize all incidents to have required fields
+for _inc in INCIDENTS:
+    _inc.setdefault("progression", "instant")
+    _inc.setdefault("cascades_to", [])
+    _inc.setdefault("affected_endpoints", [])
+    _inc.setdefault("error_rate_override", 0.20)
+    _inc.setdefault("latency_multiplier", 2.0)
+    _inc.setdefault("duration_fraction", 0.25)
+    _inc.setdefault("error_message", "Unknown error")
+
+
+def get_incident_for_drop(drop_index: int, rng=None) -> dict | None:
+    """Return an incident for this drop using Poisson-distributed occurrence.
+
+    Average ~25% of drops get an incident (Poisson lambda=0.3).
+    Uses the full incident corpus instead of cycling through 6.
+    """
+    import random as _random
+    import math
+    r = rng or _random
+    # Poisson probability of at least one event with lambda=0.3
+    # P(X >= 1) = 1 - e^(-lambda) ≈ 0.26
+    lam = 0.3
+    p = 1.0 - math.exp(-lam)
+    if r.random() > p:
         return None
-    incident_idx = (drop_index // 5) % len(INCIDENTS)
-    return INCIDENTS[incident_idx]
+    return r.choice(INCIDENTS)
 
 
 def should_apply_incident(incident: dict, service: str, endpoint: str,
