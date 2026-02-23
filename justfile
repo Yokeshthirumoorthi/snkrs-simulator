@@ -1,27 +1,14 @@
 # ─── Services ──────────────────────────────────────────────────────
 
-# Start all services (minio, otel-collector, event-generator)
+# Start collectors (nginx LB + OTEL collector replicas)
 up:
-    docker compose up -d --build
+    docker compose up -d
 
-# Stop all services
+# Stop collectors
 down:
-    docker compose down -v
+    docker compose down
 
-# Start the event generator
-start-sim:
-    docker compose start event-generator
-
-# Stop the event generator
-stop-sim:
-    docker compose stop event-generator
-
-# Tail event generator logs
-logs:
-    docker compose logs -f event-generator
-
-# ─── Load Generator (OTLP pipeline) ─────────────────────────────
-# Runs directly on the host, sends to the already-running OTEL collector on localhost:4317
+# ─── Load Generator (runs on host, sends to collectors) ──────────
 
 gen_dir := "load-generator"
 
@@ -44,10 +31,3 @@ gen-l:
 # Generate 100M spans via OTEL pipeline
 gen-xl:
     cd {{gen_dir}} && python3 generate.py --tier xl --otel-endpoint localhost:4317
-
-# ─── Utilities ────────────────────────────────────────────────────
-
-# List files in the MinIO traces bucket (all signal prefixes)
-minio-ls:
-    docker run --rm --network=snkrs-simulator_default --entrypoint /bin/sh minio/mc -c \
-        "mc alias set local http://minio:9000 minioadmin minioadmin > /dev/null 2>&1 && echo '=== traces ===' && mc ls --recursive local/traces/incoming/ && echo '=== metrics ===' && mc ls --recursive local/traces/metrics/ && echo '=== logs ===' && mc ls --recursive local/traces/logs/"

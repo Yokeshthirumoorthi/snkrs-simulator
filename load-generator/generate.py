@@ -291,8 +291,13 @@ def main():
                         help="Output directory for file mode (default: ./output)")
     parser.add_argument("--compress", action="store_true",
                         help="Enable gzip compression for file output")
+    parser.add_argument("--time-range-hours", type=int, default=None,
+                        help="Override time range in hours (default: use tier's default)")
 
     args = parser.parse_args()
+
+    if args.time_range_hours is not None:
+        TIERS[args.tier]["time_range_hours"] = args.time_range_hours
 
     if args.workers is None:
         cpu_count = multiprocessing.cpu_count()

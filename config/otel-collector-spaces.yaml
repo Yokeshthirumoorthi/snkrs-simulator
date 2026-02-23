@@ -1,0 +1,69 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 64
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    send_batch_size: 50000
+    timeout: 1s
+    send_batch_max_size: 100000
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1536
+    spike_limit_mib: 512
+
+exporters:
+  awss3/traces:
+    s3uploader:
+      endpoint: https://${DO_SPACES_REGION}.digitaloceanspaces.com
+      region: ${DO_SPACES_REGION}
+      s3_force_path_style: true
+      s3_bucket: ${DO_SPACES_BUCKET}
+      s3_prefix: incoming
+      file_prefix: otlp_
+    marshaler: otlp_json
+
+  awss3/metrics:
+    s3uploader:
+      endpoint: https://${DO_SPACES_REGION}.digitaloceanspaces.com
+      region: ${DO_SPACES_REGION}
+      s3_force_path_style: true
+      s3_bucket: ${DO_SPACES_BUCKET}
+      s3_prefix: metrics
+      file_prefix: otlp_
+    marshaler: otlp_json
+
+  awss3/logs:
+    s3uploader:
+      endpoint: https://${DO_SPACES_REGION}.digitaloceanspaces.com
+      region: ${DO_SPACES_REGION}
+      s3_force_path_style: true
+      s3_bucket: ${DO_SPACES_BUCKET}
+      s3_prefix: logs
+      file_prefix: otlp_
+    marshaler: otlp_json
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [awss3/traces]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [awss3/metrics]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [awss3/logs]
