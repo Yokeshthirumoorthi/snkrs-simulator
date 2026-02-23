@@ -10,7 +10,7 @@ services:
       - otel-collector
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.115.1
     deploy:
       replicas: ${COLLECTORS:-2}
       resources:
@@ -20,10 +20,12 @@ services:
     volumes:
       - ./config/otel-collector-spaces.yaml:/etc/otelcol-contrib/config.yaml:ro
     environment:
-      AWS_ACCESS_KEY_ID: ${DO_SPACES_KEY}
-      AWS_SECRET_ACCESS_KEY: ${DO_SPACES_SECRET}
-      DO_SPACES_REGION: ${DO_SPACES_REGION}
-      DO_SPACES_BUCKET: ${DO_SPACES_BUCKET}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_PREFIX: ${S3_PREFIX}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133"]
       interval: 10s

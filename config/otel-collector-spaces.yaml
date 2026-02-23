@@ -20,31 +20,31 @@ processors:
 exporters:
   awss3/traces:
     s3uploader:
-      endpoint: https://${DO_SPACES_REGION}.digitaloceanspaces.com
-      region: ${DO_SPACES_REGION}
+      endpoint: ${S3_ENDPOINT}
+      region: ${S3_REGION}
       s3_force_path_style: true
-      s3_bucket: ${DO_SPACES_BUCKET}
-      s3_prefix: incoming
+      s3_bucket: ${S3_BUCKET}
+      s3_prefix: ${S3_PREFIX}/traces
       file_prefix: otlp_
     marshaler: otlp_json
 
   awss3/metrics:
     s3uploader:
-      endpoint: https://${DO_SPACES_REGION}.digitaloceanspaces.com
-      region: ${DO_SPACES_REGION}
+      endpoint: ${S3_ENDPOINT}
+      region: ${S3_REGION}
       s3_force_path_style: true
-      s3_bucket: ${DO_SPACES_BUCKET}
-      s3_prefix: metrics
+      s3_bucket: ${S3_BUCKET}
+      s3_prefix: ${S3_PREFIX}/metrics
       file_prefix: otlp_
     marshaler: otlp_json
 
   awss3/logs:
     s3uploader:
-      endpoint: https://${DO_SPACES_REGION}.digitaloceanspaces.com
-      region: ${DO_SPACES_REGION}
+      endpoint: ${S3_ENDPOINT}
+      region: ${S3_REGION}
       s3_force_path_style: true
-      s3_bucket: ${DO_SPACES_BUCKET}
-      s3_prefix: logs
+      s3_bucket: ${S3_BUCKET}
+      s3_prefix: ${S3_PREFIX}/logs
       file_prefix: otlp_
     marshaler: otlp_json
 
