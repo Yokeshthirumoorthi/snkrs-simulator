@@ -19,15 +19,37 @@ import math
 import multiprocessing
 import os
 import random
+import shutil
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from users import get_users
 from inventory import select_drop_product, StockTracker, PRODUCTS
 from patterns import get_incident_for_drop, PATTERNS
 from metrics import generate_metrics_for_interval
 from writer import OTLPWriter, FileWriter, create_writer, worker_fn
+import writer as _writer_mod
+
+
+def print_progress_bar(current, total, prefix="", elapsed=0.0):
+    if total <= 0:
+        return
+    cols = shutil.get_terminal_size((80, 20)).columns
+    pct = min(100, int(100 * current / total))
+    rate = int(current / max(0.1, elapsed))
+    suffix = f" {current:,}/{total:,} ({pct}%) {rate:,}/s"
+    bar_width = max(10, cols - len(prefix) - len(suffix) - 5)
+    filled = int(bar_width * current / total)
+    bar = "\u2588" * filled + "\u2591" * (bar_width - filled)
+    sys.stderr.write(f"\r{prefix} [{bar}]{suffix}")
+    sys.stderr.flush()
+
+
+def _init_worker(counter):
+    """Pool initializer — stash the shared counter where worker_fn can find it."""
+    _writer_mod._shared_counter = counter
+
 
 # ── Tier definitions ────────────────────────────────────────────────────
 
@@ -130,8 +152,10 @@ def generate_metrics_centrally(drop_schedule: list, tier: dict,
     )
 
     rng = random.Random(54321)
+    metrics_start = time.time()
+    total_drops = len(drop_schedule)
 
-    for drop_idx, product, incident, drop_start, drop_end in drop_schedule:
+    for drop_num, (drop_idx, product, incident, drop_start, drop_end) in enumerate(drop_schedule):
         drop_duration = (drop_end - drop_start).total_seconds()
         stock_tracker = StockTracker()
         stock_tracker.reset_for_drop(product, rng)
@@ -167,6 +191,10 @@ def generate_metrics_centrally(drop_schedule: list, tier: dict,
 
             ts += timedelta(seconds=10)
 
+        print_progress_bar(drop_num + 1, total_drops,
+                          prefix="  Metrics", elapsed=time.time() - metrics_start)
+
+    sys.stderr.write("\n")
     writer.flush_all()
     stats = writer.stats()
     writer.close()
@@ -202,7 +230,7 @@ def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int,
     # Build drop schedule
     print(f"\n[2/4] Building drop schedule ({tier['drops']} drops over {tier['time_range_hours']}h)...")
     # End time is "now" so data looks recent
-    end_time = datetime.utcnow()
+    end_time = datetime.now(timezone.utc).replace(tzinfo=None)
     schedule_start = end_time - timedelta(hours=tier["time_range_hours"])
     drop_schedule = build_drop_schedule(tier, schedule_start)
 
@@ -233,11 +261,24 @@ def run(tier_name: str, workers: int, otel_endpoint: str, batch_size: int,
         worker_args.append((chunk, (schedule_start, end_time), drop_schedule, config))
 
 
+    total_units = len(users) * len(drop_schedule)
+    shared_counter = multiprocessing.Value('i', 0)
+
     print(f"  Launching {actual_workers} worker processes...")
     pool_start = time.time()
 
-    with multiprocessing.Pool(processes=actual_workers) as pool:
-        results = pool.map(worker_fn, worker_args)
+    with multiprocessing.Pool(processes=actual_workers,
+                              initializer=_init_worker,
+                              initargs=(shared_counter,)) as pool:
+        async_result = pool.map_async(worker_fn, worker_args)
+        while not async_result.ready():
+            print_progress_bar(shared_counter.value, total_units,
+                              prefix="  Spans+Logs", elapsed=time.time() - pool_start)
+            time.sleep(0.25)
+        print_progress_bar(total_units, total_units,
+                          prefix="  Spans+Logs", elapsed=time.time() - pool_start)
+        sys.stderr.write("\n")
+        results = async_result.get()
 
     pool_elapsed = time.time() - pool_start
 

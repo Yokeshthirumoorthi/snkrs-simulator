@@ -6,10 +6,13 @@ as protobuf messages via gRPC, or writes directly to JSON files for TB scale.
 import gzip
 import json
 import os
+import sys
 import time
 from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
+
+_this_module = sys.modules[__name__]
 
 import grpc
 from opentelemetry.proto.common.v1.common_pb2 import (
@@ -272,6 +275,7 @@ class OTLPWriter:
         self.spans_written = 0
         self.logs_written = 0
         self.metrics_written = 0
+        self.errors = 0
         self._start_time = time.time()
 
     def connect(self):
@@ -326,38 +330,50 @@ class OTLPWriter:
             self._flush_metrics(self._metrics)
             self._metrics = []
 
+    def _flush_with_retry(self, flush_fn, batch, label):
+        """Retry a flush with exponential backoff on transient gRPC errors."""
+        max_retries = 5
+        delay = 1.0
+        for attempt in range(max_retries + 1):
+            try:
+                flush_fn(batch)
+                return
+            except grpc.RpcError as e:
+                if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < max_retries:
+                    print(f"  [RETRY] {label}: {e.details()} — retrying in {delay:.0f}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(delay)
+                    delay = min(delay * 2, 30)
+                else:
+                    print(f"  [ERROR] Failed to send {len(batch)} {label}: {e}")
+                    self.errors += 1
+                    return  # don't re-raise — avoids pickle crash
+
     def _flush_spans(self, batch: list[dict]):
         if not batch:
             return
-        try:
-            request = _spans_to_proto(batch)
+        def _send(b):
+            request = _spans_to_proto(b)
             self.trace_stub.Export(request)
-            self.spans_written += len(batch)
-        except Exception as e:
-            print(f"  [ERROR] Failed to send {len(batch)} spans: {e}")
-            raise
+            self.spans_written += len(b)
+        self._flush_with_retry(_send, batch, "spans")
 
     def _flush_logs(self, batch: list[dict]):
         if not batch:
             return
-        try:
-            request = _logs_to_proto(batch)
+        def _send(b):
+            request = _logs_to_proto(b)
             self.logs_stub.Export(request)
-            self.logs_written += len(batch)
-        except Exception as e:
-            print(f"  [ERROR] Failed to send {len(batch)} logs: {e}")
-            raise
+            self.logs_written += len(b)
+        self._flush_with_retry(_send, batch, "logs")
 
     def _flush_metrics(self, batch: list[dict]):
         if not batch:
             return
-        try:
-            request = _metrics_to_proto(batch)
+        def _send(b):
+            request = _metrics_to_proto(b)
             self.metrics_stub.Export(request)
-            self.metrics_written += len(batch)
-        except Exception as e:
-            print(f"  [ERROR] Failed to send {len(batch)} metrics: {e}")
-            raise
+            self.metrics_written += len(b)
+        self._flush_with_retry(_send, batch, "metrics")
 
     def stats(self) -> dict:
         """Return current stats."""
@@ -368,6 +384,7 @@ class OTLPWriter:
             "logs": self.logs_written,
             "metrics": self.metrics_written,
             "total": total,
+            "errors": self.errors,
             "elapsed_s": round(elapsed, 1),
             "rows_per_sec": round(total / max(1, elapsed)),
         }
@@ -376,7 +393,7 @@ class OTLPWriter:
         """Print a one-line progress update."""
         s = self.stats()
         print(f"  spans={s['spans']:,}  logs={s['logs']:,}  metrics={s['metrics']:,}  "
-              f"total={s['total']:,}  elapsed={s['elapsed_s']}s  "
+              f"total={s['total']:,}  errors={s['errors']}  elapsed={s['elapsed_s']}s  "
               f"rate={s['rows_per_sec']:,} rows/sec")
 
 
@@ -607,6 +624,7 @@ def worker_fn(args: tuple) -> dict:
         Stats dict with counts.
     """
     user_chunk, time_range, drop_configs, otel_config = args
+    shared_counter = getattr(_this_module, '_shared_counter', None)
 
     # Import here to avoid issues with multiprocessing
     import random as _random
@@ -692,6 +710,10 @@ def worker_fn(args: tuple) -> dict:
                         gap_ms = rng.randint(*pattern["session_gap_ms"])
                         from datetime import timedelta
                         action_ts = action_ts + timedelta(milliseconds=gap_ms)
+
+            if shared_counter is not None:
+                with shared_counter.get_lock():
+                    shared_counter.value += 1
 
     writer.flush_all()
     stats = writer.stats()

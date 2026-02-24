@@ -9,13 +9,13 @@ receivers:
 
 processors:
   batch:
-    send_batch_size: 50000
-    timeout: 1s
-    send_batch_max_size: 100000
+    send_batch_size: 100000
+    timeout: 200ms
+    send_batch_max_size: 200000
   memory_limiter:
     check_interval: 1s
-    limit_mib: 1536
-    spike_limit_mib: 512
+    limit_mib: 2048
+    spike_limit_mib: 768
 
 exporters:
   awss3/traces:
